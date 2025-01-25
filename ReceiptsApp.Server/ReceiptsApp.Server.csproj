@@ -1,15 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
+    <Nullable>disable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <SpaRoot>..\receiptsapp.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:5173</SpaProxyServerUrl>
+    <UserSecretsId>8229ea2a-fb9e-44d8-a556-a253dbff368a</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Cloud.Vision.V1" Version="3.7.0" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>8.*-*</Version>
     </PackageReference>
@@ -22,12 +24,4 @@
     </ProjectReference>
   </ItemGroup>
   
-<ItemGroup>
-  <PackageReference Include="Tesseract" Version="4.1.0.1" />
-</ItemGroup>
-  
-<ItemGroup>
-  <Folder Include="tessdata\" />
-</ItemGroup>
-
 </Project>
