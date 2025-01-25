@@ -1,4 +1,12 @@
-import { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
+import {
+    Card,
+    CardContent,
+    CardActions,
+    Typography,
+    Button,
+    Box,
+} from "@mui/material";
 
 const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
     const [imageSrc, setImageSrc] = useState(null);
@@ -29,10 +37,10 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
         reader.readAsDataURL(file);
     };
 
-    /**
-     * Converts mouse event (x,y) into *original-image* coordinates,
-     * based on the scaled canvas size (displayWidth x displayHeight).
-     */
+    
+     //* Converts mouse event (x,y) into *original-image* coordinates,
+     //* based on the scaled canvas size (displayWidth x displayHeight).
+     
     const getOriginalCoords = (e) => {
         const rect = canvasRef.current.getBoundingClientRect();
         const scaleX = imageDimensions.width / displayWidth;
@@ -223,33 +231,72 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
     }, [imageSrc, corners, imageDimensions]);
 
     return (
-        <div style={{ textAlign: "center" }}>
-            <h3>Step 1: Upload Image</h3>
-            <input type="file" accept="image/*" onChange={handleImageUpload} />
+        <Card sx={{ maxWidth: 650, margin: "20px auto" }}>
+            <CardContent>
+                <Typography variant="h6" gutterBottom>
+                    1. Upload Image
+                </Typography>
+                <Button
+                    variant="contained"
+                    component="label"
+                    sx={{ mb: 2 }}
+                >
+                    Choose File
+                    <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={handleImageUpload}
+                    />
+                </Button>
+
+                {imageSrc && (
+                    <>
+                        <Typography variant="h6" gutterBottom>
+                            2. Select 4 Corners
+                        </Typography>
+                        <Box
+                            sx={{
+                                position: "relative",
+                                display: "inline-block",
+                                border: "1px solid #ccc",
+                                cursor: "crosshair",
+                            }}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                        >
+                            <canvas
+                                ref={canvasRef}
+                                width={displayWidth}
+                                height={displayHeight}
+                                onClick={handleCanvasClick}
+                            />
+                        </Box>
+
+                    </>
+                )}
+            </CardContent>
 
             {imageSrc && (
-                <>
-                    <h3>Step 2: Select 4 Corners</h3>
-                    <div
-                        style={{ position: "relative", display: "inline-block" }}
-                        onMouseMove={handleMouseMove}
-                        onMouseDown={handleMouseDown}
-                        onMouseUp={handleMouseUp}
+                <CardActions sx={{ justifyContent: "center", mb: 2 }}>
+                    <Button
+                        variant="outlined"
+                        color="warning"
+                        onClick={handleClearCorners}
                     >
-                        <canvas
-                            ref={canvasRef}
-                            style={{ border: "1px solid black", cursor: "crosshair" }}
-                            onClick={handleCanvasClick}
-                        />
-                    </div>
-
-                    <div style={{ marginTop: "10px" }}>
-                        <button onClick={handleClearCorners}>Clear Corners</button>
-                        <button onClick={handleSubmit}>Submit (Crop & OCR)</button>
-                    </div>
-                </>
+                        Clear Corners
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleSubmit}
+                    >
+                        Submit (Crop & OCR)
+                    </Button>
+                </CardActions>
             )}
-        </div>
+        </Card>
     );
 };
 

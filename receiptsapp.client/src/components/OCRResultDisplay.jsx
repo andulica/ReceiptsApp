@@ -1,16 +1,41 @@
+import React from "react";
+import { Paper, Typography, Button } from "@mui/material";
+
 const OCRResultDisplay = ({ ocrText, onClear }) => {
     if (!ocrText) return null;
 
     return (
-        <div style={{ marginTop: "20px" }}>
-            <h2>Extracted Text</h2>
-            <pre style={{ border: "1px solid #ccc", padding: "10px" }}>
+        <Paper
+            elevation={3}
+            sx={{ p: 2, mt: 2, textAlign: "left" }}
+        >
+            <Typography variant="h6" gutterBottom>
+                Extracted Text
+            </Typography>
+            <Typography
+                variant="body1"
+                component="pre"
+                sx={{
+                    whiteSpace: "pre-wrap",
+                    backgroundColor: "#f5f5f5",
+                    p: 1,
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    minHeight: 100,
+                }}
+            >
                 {ocrText}
-            </pre>
-            <button style={{ marginTop: "10px" }} onClick={onClear}>
+            </Typography>
+
+            <Button
+                variant="contained"
+                color="primary"
+                onClick={onClear}
+                sx={{ mt: 2 }}
+            >
                 Clear
-            </button>
-        </div>
+            </Button>
+        </Paper>
     );
 };
 
