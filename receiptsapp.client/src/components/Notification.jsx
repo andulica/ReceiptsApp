@@ -9,7 +9,7 @@ const Notification = ({ message, type }) => {
     if (type === "success") severity = "success";
     else if (type === "error") severity = "error";
     else if (type === "info") severity = "info";
-    else severity = "warning"; // fallback
+    else severity = "warning";
 
     return (
         <Stack sx={{ width: "100%", mb: 2 }} spacing={2}>

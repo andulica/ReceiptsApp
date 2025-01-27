@@ -1,45 +1,75 @@
 import React from "react";
-import { Box, Typography, Avatar, TextField } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
+import { AppBar, Toolbar, Typography, Box, Button } from "@mui/material";
+import { motion } from "framer-motion";
 
-const TopBar = () => {
+// Icons
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import CameraAltIcon from "@mui/icons-material/CameraAlt";
+import PersonIcon from "@mui/icons-material/Person";
+import Logo from "./Logo"
+
+export default function TopBar() {
     return (
-        <Box
+        <AppBar
+            position="sticky"
+            component={motion.div}
+            initial={{ y: -70, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
             sx={{
-                height: 60,
-                bgcolor: "background.paper",
-                display: "flex",
-                alignItems: "center",
-                px: 2,
-                justifyContent: "space-between",
+                background: "linear-gradient(150deg, #05201A 10%, #1b664c 90%)",
+                boxShadow: "none",
+                py: { xs: 1, md: 1.5 },
             }}
         >
-            <Box
-                sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    bgcolor: "#1f2d2c",
-                    borderRadius: 2,
-                    p: "0 8px",
-                }}
-            >
-                <SearchIcon sx={{ color: "text.secondary" }} />
-                <TextField
-                    variant="standard"
-                    placeholder="Search payment"
-                    InputProps={{ disableUnderline: true }}
-                    sx={{ ml: 1, color: "text.secondary" }}
-                />
-            </Box>
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography variant="body1" color="text.primary">
-                    Hi Stefan!
+            <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
+                {/* Left side: Brand */}
+                <Typography
+                    variant="h6"
+                    sx={{
+                        fontWeight: 700,
+                        ml: { xs: 1, md: 2 },
+                    }}
+                >
+                    <Logo />
                 </Typography>
-                <Avatar alt="Stefan" src="https://i.pravatar.cc/40?img=3" />
-            </Box>
-        </Box>
-    );
-};
 
-export default TopBar;
+                {/* Right side: Nav items */}
+                <Box
+                    sx={{
+                        display: "flex",
+                        gap: 2,
+                    }}
+                >
+                    {/* Dashboard */}
+                    <Button color="inherit" sx={{ fontWeight: 600 }}>
+                        <DashboardIcon sx={{ mr: 0.5 }} />
+                        Dashboard
+                    </Button>
+
+                    {/* Take Foto Receipts */}
+                    <Button color="inherit" sx={{ fontWeight: 600 }}>
+                        <CameraAltIcon sx={{ mr: 0.5 }} />
+                        Take Foto Receipts
+                    </Button>
+
+                    {/* Login */}
+                    <Button
+                        variant="outlined"
+                        sx={{
+                            fontWeight: 600,
+                            color: "#fff",
+                            borderColor: "rgba(255,255,255,0.7)",
+                            "&:hover": {
+                                borderColor: "#fff",
+                            },
+                        }}
+                    >
+                        <PersonIcon sx={{ mr: 0.5 }} />
+                        Login
+                    </Button>
+                </Box>
+            </Toolbar>
+        </AppBar>
+    );
+}
