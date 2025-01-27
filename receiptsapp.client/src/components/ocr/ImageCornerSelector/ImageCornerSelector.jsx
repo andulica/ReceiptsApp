@@ -3,7 +3,7 @@ import { Card, CardContent, CardActions, Typography, Button, Box } from "@mui/ma
 import ImageUploadButton from "./ImageUploadButton";
 import CornerCanvas from "./CornerCanvas";
 import { useCornerSelector } from "./useCornerSelector";
-import { cropAndOcr } from "../../services/ocrService";
+import { cropAndOcr } from "../../../services/ocrService";
 
 const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
     const [imageSrc, setImageSrc] = useState(null);

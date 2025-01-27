@@ -11,7 +11,7 @@ const data = [
     { name: "Aug", uv: 1900 },
 ];
 
-const DashboardContent = () => {
+const DashboardPage = () => {
     return (
         <Box sx={{ flexGrow: 1, p: 2 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
@@ -59,4 +59,4 @@ const DashboardContent = () => {
     );
 };
 
-export default DashboardContent;
+export default DashboardPage;

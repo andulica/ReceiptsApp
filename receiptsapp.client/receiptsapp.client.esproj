@@ -10,5 +10,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="src\components\ocr\ImageCornerSelector\" />
+    <Folder Include="src\services\" />
   </ItemGroup>
 </Project>

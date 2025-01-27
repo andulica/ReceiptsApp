@@ -1,6 +1,8 @@
 import React from "react";
 import { AppBar, Toolbar, Typography, Box, Button } from "@mui/material";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+
 
 // Icons
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -35,25 +37,30 @@ export default function TopBar() {
                 </Typography>
 
                 {/* Right side: Nav items */}
-                <Box
-                    sx={{
-                        display: "flex",
-                        gap: 2,
-                    }}
-                >
+                <Box sx={{ display: "flex", gap: 2 }}>
                     {/* Dashboard */}
-                    <Button color="inherit" sx={{ fontWeight: 600 }}>
+                    <Button
+                        color="inherit"
+                        sx={{ fontWeight: 600 }}
+                        component={Link}
+                        to="/dashboard"
+                    >
                         <DashboardIcon sx={{ mr: 0.5 }} />
                         Dashboard
                     </Button>
 
-                    {/* Take Foto Receipts */}
-                    <Button color="inherit" sx={{ fontWeight: 600 }}>
+                    {/* Take Photo Receipts -> goes to /ocr */}
+                    <Button
+                        color="inherit"
+                        sx={{ fontWeight: 600 }}
+                        component={Link}
+                        to="/ocr"
+                    >
                         <CameraAltIcon sx={{ mr: 0.5 }} />
                         Take Foto Receipts
                     </Button>
 
-                    {/* Login */}
+                    {/* Login -> goes to /login */}
                     <Button
                         variant="outlined"
                         sx={{
@@ -64,6 +71,8 @@ export default function TopBar() {
                                 borderColor: "#fff",
                             },
                         }}
+                        component={Link}
+                        to="/login"
                     >
                         <PersonIcon sx={{ mr: 0.5 }} />
                         Login

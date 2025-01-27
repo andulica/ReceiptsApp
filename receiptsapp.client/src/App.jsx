@@ -1,24 +1,39 @@
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { CssBaseline, Box } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
-import myTheme from "./theme";
-import HeroSection from "./components/sections/HeroSection";
-import HowItWorksSection from "./components/sections/HowItWorksSection";
-import Footer from "./components/layout/Footer";
-import CategorizeExpensesSection from "./components/sections/CategorizeExpensesSection";
-import TopBar from "./components/layout/TopBar";
 
+import myTheme from "./theme";
+import TopBar from "./components/layout/TopBar";
+import Footer from "./components/layout/Footer";
+
+// Pages
+import HomePage from "./pages/HomePage";
+import DashboardPage from "./pages/DashboardPage";
+import OcrPage from "./pages/OcrPage";
+import LoginPage from "./pages/LoginPage";
 
 function App() {
     return (
         <ThemeProvider theme={myTheme}>
             <CssBaseline />
-            <Box sx={{ backgroundColor: "background.default" }}>
-                <TopBar />
-                <HeroSection />
-                <HowItWorksSection />
-                <CategorizeExpensesSection />
-                <Footer />
-            </Box>
+            <Router>
+                <Box sx={{ backgroundColor: "background.default", minHeight: "100vh" }}>
+                    <TopBar />
+
+                    <Routes>
+                        <Route path="/" element={<HomePage />} />
+
+                        <Route path="/dashboard" element={<DashboardPage />} />
+
+                        <Route path="/ocr" element={<OcrPage />} />
+
+                        <Route path="/login" element={<LoginPage />} />
+                    </Routes>
+
+                    <Footer />
+                </Box>
+            </Router>
         </ThemeProvider>
     );
 }
