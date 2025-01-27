@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Typography, Grid } from "@mui/material";
 import { motion } from "framer-motion";
-import MasterIllustration from "./MasterIllustration";
+import MasterIllustration from "../shared/MasterIllustration";
 import StepDescriptions from "./StepDescriptions";
 
 const containerVariants = {

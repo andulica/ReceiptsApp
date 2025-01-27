@@ -4,7 +4,7 @@ export default function StepDescriptions({ step }) {
     const stepTexts = [
         "Hoold your receipt so your phone's camera can see it clearly.",
         " Align the camera to capture the entire receipt in good lighting.",
-        " Take the picture, upload it, and let us handle the magic!",
+        " Take the picture, upload it, and let us do the magic!",
         " That’s it! It’s that easy to track your expenses with ReceiptX."
     ];
 

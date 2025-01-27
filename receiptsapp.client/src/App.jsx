@@ -1,11 +1,11 @@
 import { CssBaseline, Box } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import myTheme from "./theme";
-import HeroSection from "./components/HeroSection";
-import HowItWorksSection from "./components/HowItWorksSection";
-import Footer from "./components/Footer";
-import CategorizeExpensesSection from "./components/CategorizeExpensesSection";
-import TopBar from "./components/TopBar";
+import HeroSection from "./components/sections/HeroSection";
+import HowItWorksSection from "./components/sections/HowItWorksSection";
+import Footer from "./components/layout/Footer";
+import CategorizeExpensesSection from "./components/sections/CategorizeExpensesSection";
+import TopBar from "./components/layout/TopBar";
 
 
 function App() {

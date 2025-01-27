@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import PersonIcon from "@mui/icons-material/Person";
-import Logo from "./Logo"
+import Logo from "../shared/Logo"
 
 export default function TopBar() {
     return (
