@@ -26,33 +26,22 @@ export default function MasterIllustration({ step, setStep }) {
         }
     }, [step, flashControls]);
 
-    // 3) Once we reach step=4, we set lastTriggerTime (so user must wait 10s to restart)
+    // 3) Once we reach step=4, set lastTriggerTime (so user must wait 10s to restart)
     useEffect(() => {
         if (step === 4) {
-            // Record the time we *finished* the animation
             setLastTriggerTime(Date.now());
         }
     }, [step]);
 
-    // 4) On hover, we only restart if 10s passed *since finishing step=4*
+    // 4) On hover, only restart if 10s passed *since finishing step=4*
     const handleMouseEnter = () => {
-        // If we haven't finished step=4 yet, ignore the hover => do nothing
-        if (step < 4) {
-            return;
-        }
-
-        // If we did finish step=4, check the cooldown
+        if (step < 4) return;
         const now = Date.now();
-        if (now - lastTriggerTime < COOLDOWN_MS) {
-            // It's not been 10s yet => skip
-            return;
-        }
-
-        // If 10s have passed, reset step=0 => re-run
+        if (now - lastTriggerTime < COOLDOWN_MS) return;
         setStep(0);
     };
 
-    // Variants for framer-motion
+    // Framer-motion variants
     const receiptVariants = {
         hidden: { opacity: 0 },
         visible: { opacity: 1 },
@@ -66,8 +55,8 @@ export default function MasterIllustration({ step, setStep }) {
         onscreen: {
             opacity: 1,
             rotate: -25,
-            x: 300,
-            y: 420,
+            x: 270,
+            y: 330,
             transition: { type: "spring", stiffness: 300 },
         },
     };
@@ -82,7 +71,6 @@ export default function MasterIllustration({ step, setStep }) {
         },
     };
 
-    // Decide which layers to show based on step
     const receiptAnimate = step >= 1 ? "visible" : "hidden";
     const phoneAnimate = step >= 2 ? "visible" : "hidden";
     const handAnimate = step >= 3 ? "onscreen" : "offscreen";
@@ -93,9 +81,44 @@ export default function MasterIllustration({ step, setStep }) {
             viewBox="0 0 800 600"
             xmlns="http://www.w3.org/2000/svg"
             style={{ maxWidth: "100%" }}
-
         >
-            {/* Receipt */}
+            <defs>
+                {/* Drop shadow filter for more realism */}
+                <filter
+                    id="dropShadow"
+                    x="-20%"
+                    y="-20%"
+                    width="140%"
+                    height="140%"
+                >
+                    <feDropShadow
+                        dx="2"
+                        dy="4"
+                        stdDeviation="4"
+                        floodColor="#000"
+                        floodOpacity="0.2"
+                    />
+                </filter>
+
+                <linearGradient id="paperGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="100%" stopColor="#f2f2f2" />
+                </linearGradient>
+
+                <linearGradient
+                    id="phoneBodyGradient"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="1"
+                >
+                    <stop offset="0%" stopColor="#8A8E93" />
+                    <stop offset="50%" stopColor="#787C80" />
+                    <stop offset="100%" stopColor="#6E7175" />
+                </linearGradient>
+            </defs>
+
+            {/* Receipt Layer */}
             <motion.g
                 id="ReceiptLayer"
                 variants={receiptVariants}
@@ -103,51 +126,40 @@ export default function MasterIllustration({ step, setStep }) {
                 animate={receiptAnimate}
                 transition={{ duration: 1 }}
                 transform="translate(320,150) scale(0.6)"
+                filter="url(#dropShadow)"
             >
-                <defs>
-                    <linearGradient id="paperGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#fff" />
-                        <stop offset="100%" stopColor="#f3f3f3" />
-                    </linearGradient>
-                </defs>
-
                 <path
-                    d="M 0 0 
-                         H 190 
-                         V 370 
-                         L 195 375 
-                         L 190 370 
-                         L 185 375
-                         L 180 370
-                         L 175 375
-                         L 170 370
-                         L 165 375
-                         L 160 370
-                         V 400
-                         H 0
-                         Z"
+                    d="
+                        M0,0
+                        H190
+                        V340
+                        C190,340 190,345 185,345
+                        C180,345 180,340 175,340
+                        C170,340 170,345 165,345
+                        C160,345 160,340 155,340
+                        V370
+                        H0
+                        Z
+                    "
                     fill="url(#paperGradient)"
                     stroke="#ccc"
                     strokeWidth="1"
-                />
-                <text
-                    x="50%"
-                    y="40"
-                    fill="#333"
-                    fontSize="16"
-                    fontWeight="bold"
-                    textAnchor="middle"
-                    fontFamily="sans-serif"
-                >
-                </text>
-                <line x1="20" y1="50" x2="180" y2="50" stroke="#ccc" strokeWidth="1" />
+                />              
                 <text x="10" y="70" fontSize="10" fill="#555" fontFamily="sans-serif">
                     Date: 2025-01-27
                 </text>
                 <text x="10" y="85" fontSize="10" fill="#555" fontFamily="sans-serif">
                     Time: 10:00 AM
                 </text>
-                <line x1="10" y1="95" x2="190" y2="95" stroke="#999" strokeDasharray="3,3" />
+                <line
+                    x1="10"
+                    y1="95"
+                    x2="180"
+                    y2="95"
+                    stroke="#999"
+                    strokeDasharray="3,3"
+                />
+
                 <text x="10" y="115" fontSize="10" fill="#333">
                     Coffee
                 </text>
@@ -160,8 +172,22 @@ export default function MasterIllustration({ step, setStep }) {
                 <text x="170" y="130" fontSize="10" fill="#333" textAnchor="end">
                     $5.50
                 </text>
-                <line x1="10" y1="140" x2="190" y2="140" stroke="#999" strokeDasharray="3,3" />
-                <text x="10" y="160" fontSize="10" fill="#333" fontWeight="bold" fontFamily="sans-serif">
+                <line
+                    x1="10"
+                    y1="140"
+                    x2="180"
+                    y2="140"
+                    stroke="#999"
+                    strokeDasharray="3,3"
+                />
+                <text
+                    x="10"
+                    y="160"
+                    fontSize="10"
+                    fill="#333"
+                    fontWeight="bold"
+                    fontFamily="sans-serif"
+                >
                     Total
                 </text>
                 <text
@@ -175,15 +201,6 @@ export default function MasterIllustration({ step, setStep }) {
                 >
                     $8.00
                 </text>
-                <text
-                    x="50%"
-                    y="350"
-                    fill="#888"
-                    fontSize="10"
-                    textAnchor="middle"
-                    fontFamily="sans-serif"
-                >
-                </text>
             </motion.g>
 
             {/* Phone */}
@@ -194,48 +211,45 @@ export default function MasterIllustration({ step, setStep }) {
                 animate={phoneAnimate}
                 transition={{ duration: 1 }}
                 transform="translate(250,100) scale(1.2)"
+                filter="url(#dropShadow)"
             >
-                <defs>
-                    <linearGradient id="phoneBodyGradient" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#6E8E59" />
-                        <stop offset="50%" stopColor="#6E8E59" />
-                        <stop offset="100%" stopColor="#6E8E59" />
-                    </linearGradient>
-                </defs>
-
                 <path
+                    d="
+                        M35,20
+                        a20,20 0 0 1 20,-20
+                        h100
+                        a20,20 0 0 1 20,20
+                        v260
+                        a20,20 0 0 1 -20,20
+                        h-100
+                        a20,20 0 0 1 -20,-20
+                        z
+
+                        M56,40
+                        h100
+                        v220
+                        h-100
+                        z
+                    "
                     fill="url(#phoneBodyGradient)"
                     fillRule="evenodd"
-                    d="
-                    M 25,20
-                    a 20,20 0 0 1 20,-20
-                    h 120
-                    a 20,20 0 0 1 20,20
-                    v 300
-                    a 20,20 0 0 1 -20,20
-                    h -120
-                    a 20,20 0 0 1 -20,-20
-                    z
-
-                    M 50,45
-                    a 10,10 0 0 1 10, -10
-                    h 95
-                    a 10,10 0 0 1 10,10
-                    v 255
-                    a 10,10 0 0 1 -10,10
-                    h -95
-                    a 10,10 0 0 1 -10,-10
-                    z"
+                    stroke="#555"
+                    strokeWidth="1.5"
                 />
+
                 {/* Speaker */}
-                <rect x="84" y="15" width="40" height="5" rx="2" ry="2" fill="#333" />
-                {/* Camera */}
-                <circle cx="105" cy="27" r="4" fill="#222" />
-                {/* Home Button */}
-                <rect x="95" y="320" width="30" height="6" rx="2" ry="2" fill="#666" />
-                {/* Side Buttons */}
-                <rect x="23" y="100" width="2" height="20" fill="#666" />
-                <rect x="185" y="100" width="2" height="50" fill="#666" />
+                <rect x="75" y="25" width="50" height="4" rx="2" ry="2" fill="#333" />
+                {/* Front camera dot */}
+                <circle cx="135" cy="27" r="3" fill="#333" />
+                {/* Home button area */}
+                <circle
+                    cx="105"
+                    cy="245"
+                    r="7"
+                    fill="#444"
+                    stroke="#666"
+                    strokeWidth="1"
+                />
             </motion.g>
 
             {/* Hand */}
@@ -244,7 +258,7 @@ export default function MasterIllustration({ step, setStep }) {
                 variants={handVariants}
                 initial="offscreen"
                 animate={handAnimate}
-                transform="translate(360,480) scale(0.4)"
+                transform="translate(360,500) scale(0.4)"
             >
                 <path
                     fill="#000"
