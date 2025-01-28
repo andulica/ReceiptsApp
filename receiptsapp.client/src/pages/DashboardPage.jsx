@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Typography, Button, Card, CardContent } from "@mui/material";
+import { Box, Typography, Button, Card, CardContent, Toolbar } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const data = [
@@ -14,6 +14,10 @@ const data = [
 const DashboardPage = () => {
     return (
         <Box sx={{ flexGrow: 1, p: 2 }}>
+            <Toolbar />
+            <Toolbar />
+            <Toolbar />
+
             <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
                 <Typography variant="h5" sx={{ flexGrow: 1 }}>
                     My Dashboard
