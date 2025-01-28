@@ -2,17 +2,22 @@
 using System.Text;
 using System.Text.Json;
 using ReceiptsApp.Server.Models;
+using Microsoft.AspNetCore.Identity;
 
-namespace ReceiptsApp.Server.ReceiptControllers;
+namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
 
 [ApiController]
 [Route("api/[controller]")]
 public class ReceiptController : ControllerBase
 {
     private readonly string _googleApiKey;
-    public ReceiptController(IConfiguration config)
+    private readonly ApplicationDbContext _dbContext;
+    private readonly UserManager<IdentityUser> _userManager;
+    public ReceiptController(IConfiguration config, ApplicationDbContext dbContext, UserManager<IdentityUser> userManager)
     {
         _googleApiKey = config["GoogleCloud:ApiKey"];
+        _dbContext = dbContext;
+        _userManager = userManager;
     }
     private const string VisionApiUrl = "https://vision.googleapis.com/v1/images:annotate";
 
@@ -28,7 +33,7 @@ public class ReceiptController : ControllerBase
             await model.File.CopyToAsync(memoryStream);
             byte[] fileBytes = memoryStream.ToArray();
 
-            string base64Image = System.Convert.ToBase64String(fileBytes);
+            string base64Image = Convert.ToBase64String(fileBytes);
 
             var requestPayload = new
             {
@@ -71,4 +76,34 @@ public class ReceiptController : ControllerBase
             return StatusCode(500, $"Error processing receipt: {ex.Message}");
         }
     }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateReceipt([FromBody] ReceiptCreateModel model)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Unauthorized();
+
+        var receipt = new Receipt
+        {
+            UserId = user.Id,
+            Supplier = model.Supplier,
+            PurchaseDateTime = model.PurchaseDateTime,
+            Total = model.Total,
+            Products = model.Products
+        };
+
+        _dbContext.Receipts.Add(receipt);
+        await _dbContext.SaveChangesAsync();
+
+        return Ok(new { message = "Receipt created", receiptId = receipt.Id });
+    }
+}
+
+public class ReceiptCreateModel
+{
+    public string Supplier { get; set; } = string.Empty;
+    public DateTime PurchaseDateTime { get; set; }
+    public decimal Total { get; set; }
+    public string Products { get; set; } = string.Empty;
 }
