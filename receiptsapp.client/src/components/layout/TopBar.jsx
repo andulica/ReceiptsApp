@@ -1,83 +1,123 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AppBar, Toolbar, Typography, Box, Button } from "@mui/material";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-
+import useScrollDirection from "../../hooks/useScrollDirection";
 
 // Icons
+import HomeIcon from "@mui/icons-material/Home";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import PersonIcon from "@mui/icons-material/Person";
-import Logo from "../shared/Logo"
+import Logo from "../shared/Logo";
 
 export default function TopBar() {
+    const scrollDirection = useScrollDirection();
+    const [barHeight, setBarHeight] = useState(0);
+    const barRef = useRef(null);
+
+    useEffect(() => {
+        if (barRef.current) {
+            setBarHeight(barRef.current.offsetHeight);
+        }
+    }, []);
+
     return (
         <AppBar
-            position="sticky"
+            ref={barRef}
             component={motion.div}
-            initial={{ y: -70, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            position="fixed"
+            initial={{ y: 0 }}
+            animate={{ y: scrollDirection === "down" ? -barHeight : 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             sx={{
-                background: "linear-gradient(150deg, #05201A 10%, #1b664c 90%)",
+                background: "linear-gradient(360deg, #0f2027, #203a43, #2c5364)",
                 boxShadow: "none",
+                zIndex: 999,
                 py: { xs: 1, md: 1.5 },
+                width: "100%"
             }}
         >
             <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-                {/* Left side: Brand */}
-                <Typography
-                    variant="h6"
-                    sx={{
-                        fontWeight: 700,
-                        ml: { xs: 1, md: 2 },
-                    }}
-                >
-                    <Logo />
-                </Typography>
-
-                {/* Right side: Nav items */}
+                {/* LEFT: Navigation */}
                 <Box sx={{ display: "flex", gap: 2 }}>
+                    {/* Home */}
+                    <Button
+                        component={Link}
+                        to="/"
+                        sx={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            "&:hover": {
+                                borderColor: "#fff",
+                                backgroundColor: "rgba(255,255,255,0.1)",
+                            },
+                        }}
+                    >
+                        <HomeIcon sx={{ mr: 0.5 }} />
+                        Home
+                    </Button>
+
                     {/* Dashboard */}
                     <Button
-                        color="inherit"
-                        sx={{ fontWeight: 600 }}
                         component={Link}
                         to="/dashboard"
+                        sx={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            "&:hover": {
+                                borderColor: "#fff",
+                                backgroundColor: "rgba(255,255,255,0.1)",
+                            },
+                        }}
                     >
                         <DashboardIcon sx={{ mr: 0.5 }} />
                         Dashboard
                     </Button>
 
-                    {/* Take Photo Receipts -> goes to /ocr */}
+                    {/* OCR */}
                     <Button
-                        color="inherit"
-                        sx={{ fontWeight: 600 }}
                         component={Link}
                         to="/ocr"
+                        sx={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            "&:hover": {
+                                borderColor: "#fff",
+                                backgroundColor: "rgba(255,255,255,0.1)",
+                            },
+                        }}
                     >
                         <CameraAltIcon sx={{ mr: 0.5 }} />
                         Take Foto Receipts
                     </Button>
 
-                    {/* Login -> goes to /login */}
+                    {/* Login */}
                     <Button
-                        variant="outlined"
-                        sx={{
-                            fontWeight: 600,
-                            color: "#fff",
-                            borderColor: "rgba(255,255,255,0.7)",
-                            "&:hover": {
-                                borderColor: "#fff",
-                            },
-                        }}
                         component={Link}
                         to="/login"
+                        sx={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            "&:hover": {
+                                borderColor: "#fff",
+                                backgroundColor: "rgba(255,255,255,0.1)",
+                            },
+                        }}
                     >
                         <PersonIcon sx={{ mr: 0.5 }} />
                         Login
                     </Button>
                 </Box>
+
+                {/* RIGHT: Logo */}
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#fff" }}>
+                    <Logo />
+                </Typography>
             </Toolbar>
         </AppBar>
     );

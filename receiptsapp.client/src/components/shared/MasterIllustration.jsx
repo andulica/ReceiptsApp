@@ -55,8 +55,8 @@ export default function MasterIllustration({ step, setStep }) {
         onscreen: {
             opacity: 1,
             rotate: -25,
-            x: 270,
-            y: 330,
+            x: 287,
+            y: 320,
             transition: { type: "spring", stiffness: 300 },
         },
     };

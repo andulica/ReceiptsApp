@@ -1,11 +1,13 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { CssBaseline, Box } from "@mui/material";
+import { CssBaseline } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 
+// Theming
 import myTheme from "./theme";
+
+// Layout
 import TopBar from "./components/layout/TopBar";
-import Footer from "./components/layout/Footer";
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -18,21 +20,14 @@ function App() {
         <ThemeProvider theme={myTheme}>
             <CssBaseline />
             <Router>
-                <Box sx={{ backgroundColor: "background.default", minHeight: "100vh" }}>
-                    <TopBar />
+                <TopBar />
 
-                    <Routes>
-                        <Route path="/" element={<HomePage />} />
-
-                        <Route path="/dashboard" element={<DashboardPage />} />
-
-                        <Route path="/ocr" element={<OcrPage />} />
-
-                        <Route path="/login" element={<LoginPage />} />
-                    </Routes>
-
-                    <Footer />
-                </Box>
+                <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/ocr" element={<OcrPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                </Routes>
             </Router>
         </ThemeProvider>
     );
