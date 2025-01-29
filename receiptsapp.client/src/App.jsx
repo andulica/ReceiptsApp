@@ -7,6 +7,7 @@ import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
 import OcrPage from "./pages/OcrPage";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPagejsx";
 
 export default function App() {
     return (
@@ -16,6 +17,7 @@ export default function App() {
             <TopBar />
 
             <Routes>
+                <Route path="/register" element={<RegisterPage />} />
                 <Route path="/" element={<HomePage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/ocr" element={<OcrPage />} />
