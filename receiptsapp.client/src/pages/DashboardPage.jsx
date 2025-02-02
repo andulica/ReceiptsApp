@@ -1,6 +1,8 @@
 import React from "react";
 import { Box, Typography, Button, Card, CardContent, Toolbar } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useNavigate } from "react-router-dom";
+
 
 const data = [
     { name: "Mar", uv: 1500 },
@@ -12,6 +14,9 @@ const data = [
 ];
 
 const DashboardPage = () => {
+
+    const navigate = useNavigate();
+
     return (
         <Box sx={{ flexGrow: 1, p: 2 }}>
             <Toolbar />
@@ -23,10 +28,12 @@ const DashboardPage = () => {
                     My Dashboard
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                    <Button variant="contained">All</Button>
-                    <Button variant="outlined">Withdrawal</Button>
-                    <Button variant="outlined">Savings</Button>
-                    <Button variant="outlined">Deposit</Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => navigate("/receipts")}
+                    >
+                        Go to Receipts
+                    </Button>
                 </Box>
             </Box>
 
