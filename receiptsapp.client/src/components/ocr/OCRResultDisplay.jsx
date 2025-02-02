@@ -11,6 +11,8 @@ const OCRResultDisplay = ({ open, onClose, ocrText }) => {
                     left: "50%",
                     transform: "translate(-50%, -50%)",
                     width: 400,
+                    maxHeight: "60vh",
+                    overflowY: "auto",
                     bgcolor: "background.paper",
                     boxShadow: 24,
                     p: 4,
@@ -44,6 +46,7 @@ const OCRResultDisplay = ({ open, onClose, ocrText }) => {
                 </Button>
             </Box>
         </Modal>
+
     );
 };
 

@@ -5,7 +5,8 @@ import {
     Typography,
     CardMedia,
     Grid,
-    Button
+    Button,
+    Toolbar
 } from "@mui/material";
 import OCRResultDisplay from "../components/ocr/OCRResultDisplay";
 
@@ -77,10 +78,17 @@ function ReceiptsPage() {
 
     return (
         <div>
+            <Toolbar />
+            <Toolbar />
+            <Toolbar />
             <Grid container spacing={2}>
                 {receipts.map((receipt) => (
-                    <Grid item xs={12} sm={6} md={4} lg={3} key={receipt.id}>
-                        <Card>
+                    <Grid item xs={2} sm={2} md={2} lg={1} key={receipt.id}>
+                        <Card sx={{
+                            width: 250,
+                            height: 250,
+                            objectFit: "cover",
+                        }}      >
                             <CardContent>
                                 <Typography variant="subtitle1">
                                     {receipt.supplier || "Unknown Supplier"}
@@ -90,8 +98,11 @@ function ReceiptsPage() {
                                 component="img"
                                 alt="Receipt"
                                 image={imageUrls[receipt.id]}
-                                sx={{ maxHeight: 300, objectFit: "contain" }}
-                            />
+                                sx={{
+                                    width: 120,
+                                    height: 120,
+                                    objectFit: "cover",
+                                }}                            />
                             <CardContent>
                                 {/* See the Text Button */}
                                 <Button
