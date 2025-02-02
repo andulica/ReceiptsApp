@@ -1,6 +1,8 @@
 import React from "react";
 import { Box, Typography, Button, Grid } from "@mui/material";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+
 
 
 const containerVariants = {
@@ -118,7 +120,8 @@ export default function HeroSection() {
                     </Typography>
 
                     <Button
-                        component={motion.button}
+                        component={Link}
+                        to="/login"
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         variant="contained"

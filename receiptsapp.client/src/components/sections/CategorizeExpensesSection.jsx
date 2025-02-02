@@ -20,7 +20,6 @@ const containerVariants = {
     visible: {
         opacity: 1,
         transition: {
-            // Stagger children so the chart and text appear in sequence
             staggerChildren: 0.2,
         },
     },
@@ -74,17 +73,15 @@ function renderActiveShape(props) {
 
     return (
         <g>
-            {/* Draw the expanded sector */}
             <Sector
                 cx={cx}
                 cy={cy}
                 innerRadius={innerRadius}
-                outerRadius={outerRadius + 10} // expand by 10px
+                outerRadius={outerRadius + 10}
                 startAngle={startAngle}
                 endAngle={endAngle}
                 fill={fill}
             />
-            {/* Optionally, add a label at the center */}
             <text
                 x={cx}
                 y={cy}

@@ -362,3 +362,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /ReceiptsApp.Server/appsettings.Development.json
+/ReceiptsApp.Server/appsettings.json
+/ReceiptsApp.Server/appsettings.Development.json

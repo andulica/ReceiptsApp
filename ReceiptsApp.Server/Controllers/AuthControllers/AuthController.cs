@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using ReceiptsApp.Server.Models;
@@ -14,16 +15,11 @@ namespace ReceiptsApp.Server.Controllers.AuthControllers
     public class AuthController : ControllerBase
     {
         private readonly UserManager<IdentityUser> _userManager;
-        private readonly SignInManager<IdentityUser> _signInManager;
         private readonly IConfiguration _configuration;
 
-        public AuthController(
-            UserManager<IdentityUser> userManager,
-            SignInManager<IdentityUser> signInManager,
-            IConfiguration configuration)
+        public AuthController(UserManager<IdentityUser> userManager, IConfiguration configuration)
         {
             _userManager = userManager;
-            _signInManager = signInManager;
             _configuration = configuration;
         }
 
@@ -34,8 +30,7 @@ namespace ReceiptsApp.Server.Controllers.AuthControllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var existingUser = await _userManager.FindByEmailAsync(model.Email);
-            if (existingUser != null)
+            if (await _userManager.FindByEmailAsync(model.Email) != null)
             {
                 return BadRequest(new { message = "Email is already in use." });
             }
@@ -47,14 +42,13 @@ namespace ReceiptsApp.Server.Controllers.AuthControllers
             };
 
             var result = await _userManager.CreateAsync(user, model.Password);
-
             if (!result.Succeeded)
             {
                 var errors = string.Join("; ", result.Errors.Select(e => e.Description));
                 return BadRequest(new { message = errors });
             }
 
-            return Ok(new { message = "Registration successful" });
+            return Ok(await GenerateAndSetJwtToken(user, "Registration successful"));
         }
 
         // POST: api/Auth/login
@@ -65,44 +59,74 @@ namespace ReceiptsApp.Server.Controllers.AuthControllers
                 return BadRequest(ModelState);
 
             var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user == null)
+            if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
             {
                 return Unauthorized(new { message = "Invalid credentials" });
             }
 
-            var isPasswordValid = await _userManager.CheckPasswordAsync(user, model.Password);
-            if (!isPasswordValid)
+            return Ok(await GenerateAndSetJwtToken(user, "Login successful"));
+        }
+
+        // GET: api/Auth/me
+        [HttpGet("me")]
+        [Authorize]
+        public IActionResult Me()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null)
             {
-                return Unauthorized(new { message = "Invalid credentials" });
+                return Unauthorized();
             }
 
+            var email = User.FindFirstValue(ClaimTypes.Email);
+            return Ok(new { userId, email });
+        }
+
+        // POST: api/Auth/logout
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Append("accessToken", "", new CookieOptions
+            {
+                Expires = DateTimeOffset.UtcNow.AddDays(-1)
+            });
+
+            return Ok(new { message = "Logged out" });
+        }
+
+        private async Task<object> GenerateAndSetJwtToken(IdentityUser user, string successMessage)
+        {
             var token = GenerateJwtToken(user);
+            HttpContext.Response.Cookies.Append("accessToken", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddHours(4)
+            });
 
-            return Ok(new { token });
+            return new { message = successMessage };
         }
 
         private string GenerateJwtToken(IdentityUser user)
         {
             var claims = new List<Claim>
-        {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-        };
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            };
 
             var secretKey = _configuration["JwtSettings:SecretKey"] ?? "ReplaceThisWithAStrongKey";
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
-                issuer: null,               
-                audience: null,           
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(4),
                 signingCredentials: creds);
 
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-            return tokenString;
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

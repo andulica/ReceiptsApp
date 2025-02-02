@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import React, { useEffect } from "react";
 
 function CornerCanvas({
@@ -13,7 +14,6 @@ function CornerCanvas({
     onMouseUp,
 }) {
     useEffect(() => {
-        // Draw the image and corners whenever corners or imageSrc change
         if (!imageSrc) return;
 
         const canvas = canvasRef.current;

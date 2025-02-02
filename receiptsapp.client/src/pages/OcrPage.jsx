@@ -13,6 +13,7 @@ function OcrPage() {
                 onOcrResult={(text) => console.log("OCR text:", text)}
                 onNotification={(msg, type) => console.log(msg, type)}
             />
+
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
     TextField,
     Button,
@@ -8,13 +8,15 @@ import {
     CardContent,
     CardActions,
 } from "@mui/material";
-import { Link } from "react-router-dom";
-
+import { Link, useNavigate } from "react-router-dom";
+import { AuthContext } from "../contexts/AuthContext";
 
 function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [errorMsg, setErrorMsg] = useState("");
+    const { auth, setAuth } = useContext(AuthContext);
+    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -24,6 +26,7 @@ function LoginPage() {
             const response = await fetch("https://localhost:7051/api/Auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({ email, password }),
             });
 
@@ -32,10 +35,10 @@ function LoginPage() {
                 throw new Error(errorData.message || "Login failed");
             }
 
-            const data = await response.json();
-            const { token } = data;
-            localStorage.setItem("jwtToken", token);
-            window.location.href = "/dashboard";
+            const userData = await response.json();
+            setAuth({ isAuthenticated: true, user: userData });
+
+            navigate("/dashboard");
         } catch (error) {
             console.error("Login error:", error);
             setErrorMsg(error.message);

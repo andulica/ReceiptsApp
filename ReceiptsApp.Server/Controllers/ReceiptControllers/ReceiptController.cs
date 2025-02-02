@@ -1,11 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using System.Text;
-using System.Text.Json;
-using ReceiptsApp.Server.Models;
+﻿using Azure.Storage.Blobs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ReceiptsApp.Server.Services;
 
 namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class ReceiptController : ControllerBase
@@ -13,63 +15,48 @@ public class ReceiptController : ControllerBase
     private readonly string _googleApiKey;
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<IdentityUser> _userManager;
-    public ReceiptController(IConfiguration config, ApplicationDbContext dbContext, UserManager<IdentityUser> userManager)
+    private readonly ReceiptService _receiptService;
+
+    public ReceiptController(
+        IConfiguration config,
+        ApplicationDbContext dbContext,
+        UserManager<IdentityUser> userManager,
+        ReceiptService receiptService)
     {
-        _googleApiKey = config["GoogleCloud:ApiKey"];
+        _googleApiKey = config["GoogleCloud:ApiKey"] ?? throw new ArgumentNullException("GoogleCloud:ApiKey");
         _dbContext = dbContext;
         _userManager = userManager;
+        _receiptService = receiptService;
     }
-    private const string VisionApiUrl = "https://vision.googleapis.com/v1/images:annotate";
 
-    [HttpPost]
-    public async Task<IActionResult> Post([FromForm] ReceiptUpload model)
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadReceipt([FromForm] IFormFile file)
     {
-        if (model.File == null || model.File.Length == 0)
-            return BadRequest("No file uploaded.");
+        if (file == null || file.Length == 0)
+            return BadRequest("No file provided");
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
+        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(fileExtension))
+            return BadRequest("Invalid file type. Allowed types: jpg, jpeg, png, pdf.");
+
+        const long maxFileSize = 5 * 1024 * 1024; // 5MB
+        if (file.Length > maxFileSize)
+            return BadRequest("File size exceeds the maximum limit of 5MB.");
+
+        var userId = _userManager.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized("User not logged in");
+
+        var uniqueFileName = _receiptService.GenerateUniqueFileName(userId, file.FileName);
 
         try
         {
-            using var memoryStream = new MemoryStream();
-            await model.File.CopyToAsync(memoryStream);
-            byte[] fileBytes = memoryStream.ToArray();
+            await _receiptService.UploadToBlobStorage(file, uniqueFileName);
+            var ocrText = await _receiptService.ProcessOcr(file);
+            await _receiptService.SaveReceiptAsync(userId, uniqueFileName, ocrText);
 
-            string base64Image = Convert.ToBase64String(fileBytes);
-
-            var requestPayload = new
-            {
-                requests = new[]
-                {
-                    new
-                    {
-                        image = new { content = base64Image },
-                        features = new[]
-                        {
-                            new { type = "TEXT_DETECTION" }
-                        }
-                    }
-                }
-            };
-
-            string jsonPayload = JsonSerializer.Serialize(requestPayload);
-
-            using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync(
-                $"{VisionApiUrl}?key={_googleApiKey}",
-                new StringContent(jsonPayload, Encoding.UTF8, "application/json")
-            );
-
-            if (!response.IsSuccessStatusCode)
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
-
-            string responseContent = await response.Content.ReadAsStringAsync();
-            var responseData = JsonSerializer.Deserialize<JsonElement>(responseContent);
-
-            var ocrText = responseData.GetProperty("responses")[0]
-                .GetProperty("textAnnotations")[0]
-                .GetProperty("description")
-                .GetString();
-
-            return Ok(new { OcrText = ocrText });
+            return Ok(new { message = "Receipt uploaded and OCR processed", receiptId = uniqueFileName });
         }
         catch (Exception ex)
         {
@@ -77,33 +64,45 @@ public class ReceiptController : ControllerBase
         }
     }
 
-    [HttpPost]
-    public async Task<IActionResult> CreateReceipt([FromBody] ReceiptCreateModel model)
+    [HttpGet("{id}/image")]
+    public async Task<IActionResult> GetReceiptImage(int id)
     {
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        var userId = _userManager.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
             return Unauthorized();
 
-        var receipt = new Receipt
+        var receipt = await _dbContext.Receipts
+            .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
+
+        if (receipt == null)
+            return NotFound("Receipt not found.");
+
+        try
         {
-            UserId = user.Id,
-            Supplier = model.Supplier,
-            PurchaseDateTime = model.PurchaseDateTime,
-            Total = model.Total,
-            Products = model.Products
-        };
-
-        _dbContext.Receipts.Add(receipt);
-        await _dbContext.SaveChangesAsync();
-
-        return Ok(new { message = "Receipt created", receiptId = receipt.Id });
+            var blobClient = new BlobClient(_receiptService.AzureConnectionString, "receipts", receipt.BlobName);
+            var downloadResponse = await blobClient.DownloadContentAsync();
+            var contentType = downloadResponse.Value.Details.ContentType ?? "application/octet-stream";
+            var fileBytes = downloadResponse.Value.Content.ToArray();
+            return File(fileBytes, contentType);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error retrieving image: {ex.Message}");
+        }
     }
-}
 
-public class ReceiptCreateModel
-{
-    public string Supplier { get; set; } = string.Empty;
-    public DateTime PurchaseDateTime { get; set; }
-    public decimal Total { get; set; }
-    public string Products { get; set; } = string.Empty;
+    [HttpGet]
+    public async Task<IActionResult> GetAllReceipts()
+    {
+        var userId = _userManager.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var receipts = await _dbContext.Receipts
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.Id)
+            .ToListAsync();
+
+        return Ok(receipts);
+    }
 }

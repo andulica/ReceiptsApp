@@ -3,16 +3,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Identity;
 using System.Text;
-using Microsoft.OpenApi.Models;
 using ReceiptsApp.Server;
+using ReceiptsApp.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    options.UseInMemoryDatabase("MyLocalDB");
-});
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+);
 
 builder.Services.AddIdentity<IdentityUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
@@ -35,37 +34,59 @@ builder.Services.AddAuthentication(options =>
     {
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = !string.IsNullOrEmpty(jwtSettings.Issuer),
-        ValidateAudience = !string.IsNullOrEmpty(jwtSettings.Audience),
+        ValidateIssuer = false,
+        ValidateAudience = false,
         ValidateLifetime = true,
         ValidIssuer = jwtSettings.Issuer,
         ValidAudience = jwtSettings.Audience
     };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            if (context.Request.Cookies.ContainsKey("accessToken"))
+            {
+                context.Token = context.Request.Cookies["accessToken"];
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
+
+builder.Services.AddScoped<ReceiptService>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(options =>
 {
-    var securityScheme = new OpenApiSecurityScheme
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "Bearer",
         BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Enter JWT token Bearer {token}", // TO DO
-    };
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Enter just the token (no 'Bearer ' prefix) or 'Bearer <token>', depending on your setup."
+    });
 
-    c.AddSecurityDefinition("Bearer", securityScheme);
-
-    var securityRequirement = new OpenApiSecurityRequirement
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
-            securityScheme, new string[] {}
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                },
+                Scheme = "oauth2",
+                Name = "Bearer",
+                In = Microsoft.OpenApi.Models.ParameterLocation.Header
+            },
+            new List<string>()
         }
-    };
-    c.AddSecurityRequirement(securityRequirement);
+    });
 });
 builder.Services.AddCors(options =>
 {
@@ -74,7 +95,9 @@ builder.Services.AddCors(options =>
         {
             policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
                   .AllowAnyHeader()
-                  .AllowAnyMethod();
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+
         });
 });
 
@@ -94,6 +117,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();

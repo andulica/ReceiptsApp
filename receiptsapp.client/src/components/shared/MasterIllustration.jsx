@@ -6,7 +6,6 @@ export default function MasterIllustration({ step, setStep }) {
     const flashControls = useAnimation();
     const COOLDOWN_MS = 10000;
 
-    // 1) Whenever step===0, we start steps 1→4 with 2s gaps
     useEffect(() => {
         if (step === 0) {
             setTimeout(() => setStep(1), 2000);
@@ -16,7 +15,6 @@ export default function MasterIllustration({ step, setStep }) {
         }
     }, [step, setStep]);
 
-    // 2) When step=3, trigger a flash after 1 second
     useEffect(() => {
         if (step === 3) {
             const timer = setTimeout(() => {
@@ -26,14 +24,12 @@ export default function MasterIllustration({ step, setStep }) {
         }
     }, [step, flashControls]);
 
-    // 3) Once we reach step=4, set lastTriggerTime (so user must wait 10s to restart)
     useEffect(() => {
         if (step === 4) {
             setLastTriggerTime(Date.now());
         }
     }, [step]);
 
-    // 4) On hover, only restart if 10s passed *since finishing step=4*
     const handleMouseEnter = () => {
         if (step < 4) return;
         const now = Date.now();
@@ -41,7 +37,6 @@ export default function MasterIllustration({ step, setStep }) {
         setStep(0);
     };
 
-    // Framer-motion variants
     const receiptVariants = {
         hidden: { opacity: 0 },
         visible: { opacity: 1 },
@@ -83,7 +78,6 @@ export default function MasterIllustration({ step, setStep }) {
             style={{ maxWidth: "100%" }}
         >
             <defs>
-                {/* Drop shadow filter for more realism */}
                 <filter
                     id="dropShadow"
                     x="-20%"

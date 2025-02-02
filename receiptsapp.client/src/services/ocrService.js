@@ -1,4 +1,4 @@
-export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://localhost:7051/api/Receipt" }) {
+export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://localhost:7051/api/Receipt/upload" }) {
     if (!imageSrc) {
         throw new Error("No image source provided.");
     }
@@ -6,7 +6,6 @@ export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://loc
         throw new Error("Please provide exactly 4 corners.");
     }
 
-    // 1. Compute bounding box
     const xs = corners.map((c) => c.x);
     const ys = corners.map((c) => c.y);
     const minX = Math.min(...xs);
@@ -17,13 +16,11 @@ export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://loc
     const cropWidth = maxX - minX;
     const cropHeight = maxY - minY;
 
-    // 2. Draw to an offscreen canvas
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.src = imageSrc;
 
         img.onload = () => {
-            // Create an offscreen canvas
             const offscreenCanvas = document.createElement("canvas");
             offscreenCanvas.width = cropWidth;
             offscreenCanvas.height = cropHeight;
@@ -41,20 +38,19 @@ export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://loc
                 cropHeight
             );
 
-            // Convert canvas to blob
             offscreenCanvas.toBlob(async (blob) => {
                 if (!blob) {
                     return reject(new Error("Failed to create blob from crop."));
                 }
 
-                // 3. Send the cropped image to the backend
                 const formData = new FormData();
                 formData.append("File", blob, "cropped_image.jpg");
 
                 try {
                     const response = await fetch(endpointUrl, {
                         method: "POST",
-                        body: formData,
+                        credentials: "include",
+                        body: formData
                     });
 
                     if (!response.ok) {
@@ -64,7 +60,6 @@ export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://loc
                     }
 
                     const result = await response.json();
-                    // result.ocrText is expected from your backend
                     resolve(result);
                 } catch (error) {
                     console.error("Error in cropAndOcr:", error);
