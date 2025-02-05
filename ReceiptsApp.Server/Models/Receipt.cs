@@ -12,6 +12,6 @@ namespace ReceiptsApp.Server.Models
         public decimal Total { get; set; }
         public string? OcrText { get; set; }
         public string BlobName { get; set; } = string.Empty;
-        public string Products { get; set; } = string.Empty;
+        public List<ReceiptProduct> Products { get; set; }
     }
 }

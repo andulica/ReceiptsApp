@@ -1,5 +1,6 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Google.Protobuf.WellKnownTypes;
 using ReceiptsApp.Server.Models;
 using System.Text;
 using System.Text.Json;
@@ -31,8 +32,8 @@ namespace ReceiptsApp.Server.Services
                 Supplier = string.Empty,
                 PurchaseDateTime = DateTime.UtcNow,
                 Total = 0,
-                Products = string.Empty
-            };
+                Products = new List<ReceiptProduct>()
+        };
 
             _dbContext.Receipts.Add(receipt);
             await _dbContext.SaveChangesAsync();

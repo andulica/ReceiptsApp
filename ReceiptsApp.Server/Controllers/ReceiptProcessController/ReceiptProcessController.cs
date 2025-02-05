@@ -13,10 +13,9 @@ namespace ReceiptsApp.Server.Controllers.ReceiptProcessController
 
         [Authorize]
         [HttpGet("{id}")]
-        public async Task<string> ReturnProcessedOcrReceiptText (int ocrTextId)
+        public async Task<string> ReturnProcessedOcrReceiptText (string ocrTextId)
         {
-            
+            return ocrTextId;
         }
-
     }
 }
