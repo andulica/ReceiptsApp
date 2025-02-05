@@ -91,6 +91,35 @@ public class ReceiptController : ControllerBase
         }
     }
 
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteReceipt(int id)
+    {
+        var userId = _userManager.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        try
+        {
+            var receipt = await _dbContext.Receipts
+                .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId);
+
+            if (receipt == null)
+                return NotFound("Receipt not found.");
+
+            var blobClient = new BlobClient(_receiptService.AzureConnectionString, "receipts", receipt.BlobName);
+            await blobClient.DeleteIfExistsAsync();
+
+            _dbContext.Receipts.Remove(receipt);
+            await _dbContext.SaveChangesAsync();
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Error deleting receipt: {ex.Message}");
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAllReceipts()
     {

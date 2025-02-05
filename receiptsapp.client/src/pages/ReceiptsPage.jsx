@@ -76,14 +76,55 @@ function ReceiptsPage() {
         setModalOpen(false);
     };
 
+    const handleDelete = async (receiptId) => {
+        // Optional: Confirm user wants to delete
+        if (!window.confirm("Are you sure you want to delete this receipt?")) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `https://localhost:7051/api/Receipt/${receiptId}`,
+                {
+                    method: "DELETE",
+                    credentials: "include",
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Failed to delete receipt.");
+            }
+
+            // If the delete was successful, remove the receipt from local state
+            setReceipts((prevReceipts) =>
+                prevReceipts.filter((r) => r.id !== receiptId)
+            );
+
+            // Also remove the corresponding image URL from state (optional)
+            setImageUrls((prevUrls) => {
+                const { [receiptId]: _, ...others } = prevUrls;
+                return others;
+            });
+
+            // Same for OCR text if needed
+            setOcrTexts((prevTexts) => {
+                const { [receiptId]: _, ...others } = prevTexts;
+                return others;
+            });
+        } catch (error) {
+            console.error("Delete error:", error);
+            // Optionally show an error message to the user
+        }
+    };
+
     return (
         <div>
             <Toolbar />
             <Toolbar />
             <Toolbar />
-            <Grid container spacing={2}>
+            <Grid container spacing={4}>
                 {receipts.map((receipt) => (
-                    <Grid item xs={2} sm={2} md={2} lg={1} key={receipt.id}>
+                    <Grid item lg={2} key={receipt.id}>
                         <Card sx={{
                             width: 250,
                             height: 250,
@@ -112,6 +153,15 @@ function ReceiptsPage() {
                                 >
                                     See the Text
                                 </Button>
+
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    onClick={() => handleDelete(receipt.id)}
+                                >
+                                    Delete
+                                </Button>
+
                             </CardContent>
                         </Card>
                     </Grid>
