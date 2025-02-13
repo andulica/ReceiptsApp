@@ -10,6 +10,6 @@
         public decimal TotalPrice { get; set; }
         public int ReceiptId { get; set; } 
         public string Category { get; set; }
-        public Receipt? Receipt { get; set; } 
+        public Receipt Receipt { get; set; } 
     }
 }

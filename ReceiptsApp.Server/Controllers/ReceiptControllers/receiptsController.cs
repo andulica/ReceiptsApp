@@ -1,8 +1,10 @@
 ﻿using Azure.Storage.Blobs;
+using ReceiptsApp.Server.MLModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.ML;
 using ReceiptsApp.Server.Services;
 
 namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
@@ -10,23 +12,26 @@ namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class ReceiptController : ControllerBase
+public class receiptsController : ControllerBase
 {
     private readonly string _googleApiKey;
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ReceiptService _receiptService;
+    private readonly ReceiptOcrProcessingService _receiptOcrProcessingService;   
 
-    public ReceiptController(
+    public receiptsController(
         IConfiguration config,
         ApplicationDbContext dbContext,
         UserManager<IdentityUser> userManager,
-        ReceiptService receiptService)
+        ReceiptService receiptService,
+        ReceiptOcrProcessingService receiptOcrProcessingService)
     {
         _googleApiKey = config["GoogleCloud:ApiKey"] ?? throw new ArgumentNullException("GoogleCloud:ApiKey");
         _dbContext = dbContext;
         _userManager = userManager;
         _receiptService = receiptService;
+        _receiptOcrProcessingService = receiptOcrProcessingService;
     }
 
     [HttpPost("upload")]
@@ -35,10 +40,10 @@ public class ReceiptController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest("No file provided");
 
-        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".pdf" };
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
         var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!allowedExtensions.Contains(fileExtension))
-            return BadRequest("Invalid file type. Allowed types: jpg, jpeg, png, pdf.");
+            return BadRequest("Invalid file type. Allowed types: jpg, jpeg, png.");
 
         const long maxFileSize = 5 * 1024 * 1024; // 5MB
         if (file.Length > maxFileSize)
@@ -50,10 +55,43 @@ public class ReceiptController : ControllerBase
 
         var uniqueFileName = _receiptService.GenerateUniqueFileName(userId, file.FileName);
 
+        MLContext MLContext = new MLContext();
+        var loadedModel = MLContext.Model.Load("LineClassificationModel.zip", out var modelInputSchema);
+        var predictionEngine = MLContext.Model.CreatePredictionEngine<LineData, LinePrediction>(loadedModel);
         try
         {
             await _receiptService.UploadToBlobStorage(file, uniqueFileName);
             var ocrText = await _receiptService.ProcessOcr(file);
+            var receiptText = await _receiptOcrProcessingService.MergeLinesViaChatGpt(ocrText);
+
+            Console.WriteLine("------ Transformed Receipt ------");
+            Console.WriteLine(receiptText);
+
+            Console.WriteLine("\n------ ML Classification Results ------");
+            var lines = receiptText.Split(
+                            new[] { "\r\n", "\n" },
+                            StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var line in lines)
+            {
+                var lineData = new LineData { TextLinie = line };
+                var prediction = predictionEngine.Predict(lineData);
+
+                string predictedLabel = prediction.PredictedLineLabel;
+                float[] scores = prediction.Score; // The probabilities or raw scores for each class
+                float maxScore = scores?.Max() ?? 0f;
+
+                bool isProductWithHighConfidence = (predictedLabel == "Product" && maxScore >= 0.8f);
+
+                Console.WriteLine($"Line: {line}");
+                Console.WriteLine($"   -> Predicted label: {predictedLabel}, confidence: {maxScore:P2}");
+
+                if (isProductWithHighConfidence)
+                {
+                    Console.WriteLine("   ** This line is highly likely to be a product. **");
+                }
+            }
+
             await _receiptService.SaveReceiptAsync(userId, uniqueFileName, ocrText);
 
             return Ok(new { message = "Receipt uploaded and OCR processed", receiptId = uniqueFileName });
@@ -131,6 +169,11 @@ public class ReceiptController : ControllerBase
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.Id)
             .ToListAsync();
+
+        if (receipts.Count == 0)
+        {
+            return NotFound("No receipts found.");
+        }
 
         return Ok(receipts);
     }

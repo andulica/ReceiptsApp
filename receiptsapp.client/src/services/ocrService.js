@@ -1,4 +1,4 @@
-export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://localhost:7051/api/Receipt/upload" }) {
+export async function cropAndOcr({ imageSrc, corners, endpointUrl = "https://localhost:7051/api/receipts/upload" }) {
     if (!imageSrc) {
         throw new Error("No image source provided.");
     }

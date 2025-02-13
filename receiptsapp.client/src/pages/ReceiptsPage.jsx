@@ -20,7 +20,7 @@ function ReceiptsPage() {
     useEffect(() => {
         const fetchReceipts = async () => {
             try {
-                const res = await fetch("https://localhost:7051/api/Receipt", {
+                const res = await fetch("https://localhost:7051/api/receipts", {
                     credentials: "include",
                 });
 
@@ -55,7 +55,7 @@ function ReceiptsPage() {
     }, []);
 
     const fetchImage = async (receiptId) => {
-        const response = await fetch(`https://localhost:7051/api/Receipt/${receiptId}/image`, {
+        const response = await fetch(`https://localhost:7051/api/receipts/${receiptId}/image`, {
             credentials: "include",
         });
 
@@ -84,7 +84,7 @@ function ReceiptsPage() {
 
         try {
             const response = await fetch(
-                `https://localhost:7051/api/Receipt/${receiptId}`,
+                `https://localhost:7051/api/receipts/${receiptId}`,
                 {
                     method: "DELETE",
                     credentials: "include",
