@@ -14,20 +14,18 @@ namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
 [Route("api/[controller]")]
 public class receiptsController : ControllerBase
 {
-    private readonly string _googleApiKey;
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ReceiptService _receiptService;
     private readonly ReceiptOcrProcessingService _receiptOcrProcessingService;   
 
     public receiptsController(
-        IConfiguration config,
+
         ApplicationDbContext dbContext,
         UserManager<IdentityUser> userManager,
         ReceiptService receiptService,
         ReceiptOcrProcessingService receiptOcrProcessingService)
     {
-        _googleApiKey = config["GoogleCloud:ApiKey"] ?? throw new ArgumentNullException("GoogleCloud:ApiKey");
         _dbContext = dbContext;
         _userManager = userManager;
         _receiptService = receiptService;
@@ -37,17 +35,6 @@ public class receiptsController : ControllerBase
     [HttpPost("upload")]
     public async Task<IActionResult> UploadReceipt([FromForm] IFormFile file)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest("No file provided");
-
-        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
-        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!allowedExtensions.Contains(fileExtension))
-            return BadRequest("Invalid file type. Allowed types: jpg, jpeg, png.");
-
-        const long maxFileSize = 5 * 1024 * 1024; // 5MB
-        if (file.Length > maxFileSize)
-            return BadRequest("File size exceeds the maximum limit of 5MB.");
 
         var userId = _userManager.GetUserId(User);
         if (string.IsNullOrEmpty(userId))
@@ -92,9 +79,7 @@ public class receiptsController : ControllerBase
                 }
             }
 
-            await _receiptService.SaveReceiptAsync(userId, uniqueFileName, ocrText);
-
-            return Ok(new { message = "Receipt uploaded and OCR processed", receiptId = uniqueFileName });
+            return Ok(new { message = "Receipt uploaded and OCR processed" });
         }
         catch (Exception ex)
         {
