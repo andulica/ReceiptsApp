@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardActions, Typography, Button, Box } from "@mui/material";
+import { Card, CardContent, CardActions, Typography, Button, Box, CircularProgress } from "@mui/material";
 import ImageUploadButton from "./ImageUploadButton";
 import CornerCanvas from "./CornerCanvas";
 import { useCornerSelector } from "./useCornerSelector";
@@ -8,11 +8,12 @@ import { cropAndOcr } from "../../../services/ocrService";
 const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
     const [imageSrc, setImageSrc] = useState(null);
     const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+    const [message, setMessage] = useState("");
+    const [loading, setLoading] = useState(false);
 
     const displayWidth = 500;
     const displayHeight = 600;
 
-    // Custom hook for corner logic
     const {
         canvasRef,
         corners,
@@ -24,7 +25,6 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
         clearCorners,
     } = useCornerSelector(imageDimensions, displayWidth, displayHeight);
 
-    // Called when user picks a file in the <ImageUploadButton />
     const handleImageSelected = (file) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -33,7 +33,8 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
             img.onload = () => {
                 setImageDimensions({ width: img.width, height: img.height });
                 setImageSrc(event.target.result);
-                setCorners([]); // reset corners
+                setCorners([]);
+                setMessage("");
             };
         };
         reader.readAsDataURL(file);
@@ -41,14 +42,15 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
 
     const handleSubmit = async () => {
         if (!imageSrc) {
-            onNotification("Please upload an image first.", "error");
+            setMessage("Please upload an image first.");
             return;
         }
         if (corners.length !== 4) {
-            onNotification("Please select exactly 4 corners.", "error");
+            setMessage("Please select exactly 4 corners.");
             return;
         }
 
+        setLoading(true);
         try {
             await cropAndOcr({
                 imageSrc,
@@ -56,9 +58,12 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
                 onNotification,
                 onOcrResult,
             });
+            setMessage("Image uploaded successfully!");
         } catch (err) {
             console.error(err);
-            onNotification(err.message, "error");
+            setMessage(err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -93,6 +98,8 @@ const ImageCornerSelector = ({ onOcrResult, onNotification }) => {
                         </Box>
                     </>
                 )}
+                {message && <Typography variant="body1" color="error">{message}</Typography>}
+                {loading && <CircularProgress sx={{ display: 'block', margin: '20px auto' }} />}
             </CardContent>
 
             {imageSrc && (
