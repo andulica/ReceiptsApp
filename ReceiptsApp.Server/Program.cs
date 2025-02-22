@@ -55,8 +55,6 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddScoped<ReceiptService>();
-builder.Services.AddScoped<ReceiptOcrProcessingService>();
-
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

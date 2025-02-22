@@ -20,179 +20,167 @@ public class receiptsController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ReceiptService _receiptService;
-    private readonly ReceiptOcrProcessingService _receiptOcrProcessingService;
 
     public receiptsController(
 
         ApplicationDbContext dbContext,
         UserManager<IdentityUser> userManager,
-        ReceiptService receiptService,
-        ReceiptOcrProcessingService receiptOcrProcessingService)
+        ReceiptService receiptService)
     {
         _dbContext = dbContext;
         _userManager = userManager;
         _receiptService = receiptService;
-        _receiptOcrProcessingService = receiptOcrProcessingService;
     }
+
+    // 1) Define an enum to identify our regex types:
+    public enum MyRegexType
+    {
+        CompanyName,
+        AddressLine
+    }
+
+    // 2) Dictionary with two patterns: CompanyName & AddressLine
+    private static readonly Dictionary<MyRegexType, string> MyRegexPatterns =
+        new Dictionary<MyRegexType, string>
+    {
+        // For matching a Romanian company name like:
+        // "S.C. MYCOMPANY S.R.L." or "SC ANOTHERFIRM S.C.S"
+        {
+            MyRegexType.CompanyName,
+            // Explanation:
+            //  (?im) => i = case-insensitive, m = multiline
+            //  ^ => start of line
+            //  (?:S\.?C\.?) => matches "SC" or "S.C."
+            //  \s+ => at least one space
+            //  .*? => lazy capture (any text) for the company name
+            //  \s+ => at least one space
+            //  (?:S\.?R\.?L\.?|S\.?C\.?S\.?) => SRL or S.R.L. or SCS or S.C.S
+            //  $ => end of line
+@"(?im)^(?<companyName>(?:S\.?C\.?\s+)?.*?\s+(?:S\.?R\.?L\.?|S\.?C\.?S\.?|S\.?N\.?C\.?|S\.?A\.?))\s*$"
+        },
+
+        // For matching address lines (everything that does NOT start with
+        // CIF, C.I.F, or "Cod Identificare Fiscala")
+        {
+            MyRegexType.AddressLine,
+ 
+        @"(?im)^(?!C\.?I\.?F|CIF|Cod\s+Identificare\s+Fiscala)(?<addressLine>.+)$"
+        }
+    };
+
+    // Helper method to retrieve the pattern by enum:
+    private string GetPattern(MyRegexType type)
+    {
+        return MyRegexPatterns[type];
+    }
+
 
     [HttpPost("upload")]
     public async Task<IActionResult> UploadReceipt([FromForm] IFormFile file)
     {
-        Receipt receipt = new Receipt();
-
+        // 1) Basic checks
         var userId = _userManager.GetUserId(User);
         if (string.IsNullOrEmpty(userId))
             return Unauthorized("User not logged in");
 
-        var uniqueFileName = _receiptService.GenerateUniqueFileName(userId, file.FileName);
+        // For demonstration: create a new Receipt object (adjust to your own model)
+        Receipt receipt = new Receipt();
 
-
-        MLContext MLContext = new MLContext();
-        var loadedModel = MLContext.Model.Load("LineClassificationModel.zip", out var modelInputSchema);
-        var predictionEngine = MLContext.Model.CreatePredictionEngine<LineData, LinePrediction>(loadedModel);
         try
         {
-            //await _receiptService.UploadToBlobStorage(file, uniqueFileName);
+            // 2) Get OCR text from the uploaded file
             var ocrText = await _receiptService.ProcessOcr(file);
-            var receiptText = await _receiptOcrProcessingService.MergeLinesViaChatGpt(ocrText);
 
-            Console.WriteLine("------ Transformed Receipt ------");
-            Console.WriteLine(receiptText);
+            Console.WriteLine(ocrText);
 
-            Console.WriteLine("Ce mai faci tu?");
-
-
-            Console.WriteLine("\n------ ML Classification Results ------");
-            var lines = receiptText.Split(
-                            new[] { "\r\n", "\n" },
-                            StringSplitOptions.RemoveEmptyEntries);
-
-                        Regex regexFormatA = new Regex(
-                @"^\s*([\d.,]+)\s+([A-Za-z]+)\s*[xX]\s*([\d.,]+)\s+(.+?)\s+([\d.,]+)\s+([A-Za-z])?\s*$",
-                RegexOptions.Compiled
+            // 3) Split OCR text into lines
+            string[] allLines = ocrText.Split(
+                new[] { "\r\n", "\n" },
+                StringSplitOptions.RemoveEmptyEntries
             );
 
-                        Regex regexFormatB = new Regex(
-                @"^\s*(.+?)\s+([\d.,]+)\s+([A-Za-z])\s*$",
-                RegexOptions.Compiled
-            );
+            // 4) Identify the company name line
+            Regex rxCompany = new Regex(
+     GetPattern(MyRegexType.CompanyName),
+     RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace
+ );
 
-            var parsedProducts = new List<ReceiptProduct>();
+            int companyLineIndex = -1;
+            string companyName = null;
 
-
-            foreach (var line in lines)
+            for (int i = 0; i < allLines.Length; i++)
             {
-                var lineData = new LineData { TextLinie = line };
-                var prediction = predictionEngine.Predict(lineData);
-
-                string predictedLabel = prediction.PredictedLineLabel;
-                float maxScore = prediction.Score?.Max() ?? 0f;
-
-                if (predictedLabel == "MERCHANT_NAME" && maxScore >= 0.8f)
+                string line = allLines[i].Trim();
+                Match match = rxCompany.Match(line);
+                if (match.Success)
                 {
-                    receipt.Supplier = line;
+                    // Found the company name line
+                    companyLineIndex = i;
+
+                    // Use the named capture group "companyName" if present
+                    if (match.Groups["companyName"].Success)
+                        companyName = match.Groups["companyName"].Value;
+                    else
+                        companyName = line; // fallback if capture fails
+
+                    receipt.Supplier = companyName; // store in receipt
+                    break;
                 }
+            }
 
-                if (predictedLabel == "TOTAL_LINE" && maxScore >= 0.8f)
+            // 5) Collect address lines below that line until we see "CIF", "C.I.F", or "Cod..."
+            List<string> addressLines = new List<string>();
+            if (companyLineIndex >= 0 && companyLineIndex < allLines.Length - 1)
+            {
+                Regex rxAddressLine = new Regex(
+                    GetPattern(MyRegexType.AddressLine),
+                    RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace
+                );
+
+                for (int i = companyLineIndex + 1; i < allLines.Length; i++)
                 {
-                    receipt.Total = Convert.ToDecimal(line);
-                }
+                    string line = allLines[i].Trim();
 
-                if (predictedLabel == "LOCATION_LINE" && maxScore >= 0.8f)
-                {
-                    receipt.Address += line.ToString();
-                }
-
-                //{
-                //    string rawTotal = line.Split(" ")[^1]; // last word
-                //    receipt.Total = ParseDecimalRomanianStyle(rawTotal);
-                //}
-
-                if (predictedLabel == "PRODUCT_LINE" && maxScore >= 0.8f)
-                {
-                    // Try Format A first
-                    Match matchA = regexFormatA.Match(line);
-                    if (matchA.Success)
-                    {                     
-
-                        string rawQuantity = matchA.Groups[1].Value;
-                        string rawUnitMeasure = matchA.Groups[2].Value;
-                        string rawUnitPrice = matchA.Groups[3].Value;
-                        string productName = matchA.Groups[4].Value.Trim();
-                        string rawTotalPrice = matchA.Groups[5].Value;
-                        string rawCategory = matchA.Groups[6].Value; // might be ""
-                        Console.WriteLine($"RawQuantity: {rawQuantity} ");
-                        Console.WriteLine($"RawUnitMeasure: {rawUnitMeasure} ");
-                        Console.WriteLine($"RawUnitPrice: {rawUnitPrice} ");
-                        Console.WriteLine($"Product Name: {productName} ");
-                        Console.WriteLine($"Raw Total Price: {rawTotalPrice} ");
-                        Console.WriteLine($"Raw category: {rawCategory} ");
-
-                        // Convert strings to numeric
-                        decimal quantity = ParseDecimalRomanianStyle(rawQuantity);
-
-                        // If no category matched, set a default
-                        string category = string.IsNullOrEmpty(rawCategory) ? "N/A" : rawCategory;
-
-                        var product = new ReceiptProduct
-                        {
-                            Receipt = receipt,
-                            ProductName = productName,
-                            Quantity = (int)(quantity),  // or store as decimal if you want partial units
-                            UnitMeasure = rawUnitMeasure,
-                            UnitPrice = Convert.ToDecimal(rawUnitPrice),
-                            TotalPrice =Convert.ToDecimal(rawTotalPrice),
-                            Category = category
-                        };
-                        parsedProducts.Add(product);
+                    // If this line matches the "address line" pattern, it's part of the address
+                    if (rxAddressLine.IsMatch(line))
+                    {
+                        addressLines.Add(line);
                     }
                     else
                     {
-                        // Try Format B (fallback)
-                        Match matchB = regexFormatB.Match(line);
-                        if (matchB.Success)
-                        {
-
-                            //trebuie sa adaug si celelalte campuri cum ar fi unit price, unit of measure si sa scot Parse Decimal function 
-                            string productName = matchB.Groups[1].Value.Trim();
-                            string rawPrice = matchB.Groups[2].Value;
-                            string rawCategory = matchB.Groups[3].Value; // e.g. "C"
-
-                            //decimal totalPrice = ParseDecimalRomanianStyle(rawPrice);
-
-                            // In the fallback, we assume quantity=1, measure=BUC, unitPrice= totalPrice
-                            var product = new ReceiptProduct
-                            {
-                                ProductName = productName,
-                                Quantity = 1,
-                                UnitMeasure = "BUC",  // or "UNSPECIFIED"
-                                //UnitPrice = totalPrice,
-                                TotalPrice = Convert.ToDecimal(rawPrice),
-                                Category = rawCategory
-                            };
-                            parsedProducts.Add(product);
-                        }
-                        else
-                        {
-                            // If neither pattern matches, you might log a warning or handle differently
-                            Console.WriteLine($"Could not parse product line with regex: {line}");
-                        }
+                        // Once we hit a line that starts with "CIF", "C.I.F", or "Cod..."
+                        // we stop collecting address lines
+                        break;
                     }
                 }
-
-                //await _receiptService.SaveReceiptAsync(userId, uniqueFileName, receiptText);
             }
-            return Ok(new { message = "Receipt uploaded and OCR processed" });
 
+            // Join address lines into a single string (or store them separately)
+            receipt.Address = string.Join(", ", addressLines);
+
+            // Optionally, you can process any further lines for product data or totals...
+            // For now, we just show a summary:
+
+            Console.WriteLine($"Detected Company: {receipt.Supplier}");
+            Console.WriteLine("Detected Address:");
+            foreach (var addr in addressLines)
+                Console.WriteLine($"   {addr}");
+
+            // 6) Return success response
+            return Ok(new
+            {
+                message = "Receipt uploaded and OCR processed successfully",
+                CompanyName = receipt.Supplier,
+                Address = receipt.Address
+            });
         }
-
         catch (Exception ex)
         {
             return StatusCode(500, $"Error processing receipt: {ex.Message}");
         }
     }
 
-    private decimal ParseDecimalRomanianStyle(string raw)
+        private decimal ParseDecimalRomanianStyle(string raw)
     {
         // In Romanian formatting, often comma is used for decimals,
         // but your input might be mixed (some lines with dot, some with comma).
