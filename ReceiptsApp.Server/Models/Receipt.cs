@@ -10,7 +10,7 @@ namespace ReceiptsApp.Server.Models
         public string Address { get; set; }
         public string Supplier { get; set; } = string.Empty;
         public DateTime PurchaseDateTime { get; set; }
-        public decimal Total { get; set; }
+        public string Total { get; set; }
         public string? OcrText { get; set; }
         public string BlobName { get; set; } = string.Empty;
         public List<ReceiptProduct> Products { get; set; }

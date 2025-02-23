@@ -31,7 +31,7 @@ namespace ReceiptsApp.Server.Services
                 OcrText = ocrText,
                 Supplier = string.Empty,
                 PurchaseDateTime = DateTime.UtcNow,
-                Total = 0,
+                Total = "0",
                 Products = new List<ReceiptProduct>()
         };
 
