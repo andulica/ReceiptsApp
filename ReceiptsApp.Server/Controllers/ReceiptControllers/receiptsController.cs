@@ -78,7 +78,7 @@ public class receiptsController : ControllerBase
         MLContext mlContext = new MLContext();
         var loadedModel = mlContext.Model.Load("LineClassificationModel.zip", out var modelInputSchema);
         var predictionEngine = mlContext.Model.CreatePredictionEngine<LineData, LinePrediction>(loadedModel);
-
+        bool firstLineForTotal = true;
         try
         {
             // 2) OCR
@@ -123,8 +123,9 @@ public class receiptsController : ControllerBase
                     else
                         receipt.Address += ", " + line;
                 }
-                else if (label == "TOTAL_LINE")
+                else if (label == "TOTAL_LINE" && firstLineForTotal)
                 {
+                    firstLineForTotal = false;
                     // We see "TOTAL" or "SUBTOTAL" etc.
                     // Attempt to also grab the next line if it's numeric or unrecognized with <80% confidence.
                     string totalLineValue = line; // store the text (like "TOTAL" or "SUBTOTAL")
