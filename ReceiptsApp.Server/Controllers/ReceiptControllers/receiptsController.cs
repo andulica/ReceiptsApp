@@ -8,7 +8,7 @@ using Microsoft.ML;
 using ReceiptsApp.Server.Services;
 using System.Text.RegularExpressions;
 using ReceiptsApp.Server.Models;
-using System.Globalization;
+using FuzzySharp;
 
 namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
 
@@ -32,37 +32,41 @@ public class receiptsController : ControllerBase
         _receiptService = receiptService;
     }
 
-    // 1) Define an enum to identify our regex types:
-    public enum MyRegexType
-    {
-        CompanyName,
-        AddressLine,
-        ProductLine
-    }
+    //// 1) Define an enum to identify our regex types:
+    //public enum MyRegexType
+    //{
+    //    CompanyName,
+    //    AddressLine,
+    //    ProductLine,
+    //    Penny
+    //}
 
-    // 2) Dictionary with two patterns: CompanyName & AddressLine
-    private static readonly Dictionary<MyRegexType, string> MyRegexPatterns =
-        new Dictionary<MyRegexType, string>
-        {
-            {
-                MyRegexType.CompanyName,
+    //// 2) Dictionary with two patterns: CompanyName & AddressLine
+    //private static readonly Dictionary<MyRegexType, string> MyRegexPatterns =
+    //    new Dictionary<MyRegexType, string>
+    //    {
+    //        {
+    //            MyRegexType.CompanyName,
 
-            @"(?im)^(?<companyName>(?:S\.?C\.?\s+)?.*?\s+(?:S\.?R\.?L\.?|S\.?C\.?S\.?|S\.?N\.?C\.?|S\.?A\.?))\s*$"
-            },
-            {
-                MyRegexType.AddressLine,
+    //        @"(?im)^(?<companyName>(?:S\.?C\.?\s+)?.*?\s+(?:S\.?R\.?L\.?|S\.?C\.?S\.?|S\.?N\.?C\.?|S\.?A\.?))\s*$"
+    //        },
+    //        {
+    //            MyRegexType.AddressLine,
  
-            @"(?im)^(?!C\.?I\.?F|CIF|Cod\s+Identificare\s+Fiscala)(?<addressLine>.+)$"
-            },
-            { 
-                MyRegexType.ProductLine, @"(?im)^(?<productLine>.*?\d+(?:[\.,]\d+)?\s+[ABCD])\s*$"
-            }
-        };
+    //        @"(?im)^(?!C\.?I\.?F|CIF|Cod\s+Identificare\s+Fiscala)(?<addressLine>.+)$"
+    //        },
+    //        { 
+    //            MyRegexType.ProductLine, @"(?im)^(?<productLine>.*?\d+(?:[\.,]\d+)?\s+[ABCD])\s*$"
+    //        },
+    //        {
+    //            MyRegexType.Penny, @" ^(?i)(?:fil  |fii  |fll  |eil  |eii  |ell  |fl ).*?(?: lei  |lel  |le   |le)$"
+    //        }
+    //    };
 
-    private string GetPattern(MyRegexType type)
-    {
-        return MyRegexPatterns[type];
-    }
+    //private string GetPattern(MyRegexType type)
+    //{
+    //    return MyRegexPatterns[type];
+    //}
 
 
     [HttpPost("upload")]
@@ -78,6 +82,7 @@ public class receiptsController : ControllerBase
         MLContext mlContext = new MLContext();
         var loadedModel = mlContext.Model.Load("LineClassificationModel.zip", out var modelInputSchema);
         var predictionEngine = mlContext.Model.CreatePredictionEngine<LineData, LinePrediction>(loadedModel);
+
         bool firstLineForTotal = true;
         try
         {
@@ -87,14 +92,19 @@ public class receiptsController : ControllerBase
             Console.WriteLine(ocrText);
 
             // 3) Split into lines
-            string[] allLines = ocrText.Split(
-                new[] { "\r\n", "\n" },
-                StringSplitOptions.RemoveEmptyEntries
-            );
+            List<string> rawLines = ocrText
+               .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+               .Select(l => l.Trim())
+               .Where(l => !string.IsNullOrEmpty(l))
+               .ToList();
+
+
+            // --- NEW STEP: remove lines that fuzzy-match "FIL Nume ... Lei" ---
+            var allLines = RemoveBetweenFilLei(rawLines);
 
             // =========== A) CLASSIFY MERCHANT & ADDRESS VIA ML (LINE BY LINE) ===========
             int firstNonMerchantIndex = -1;
-            for (int i = 0; i < allLines.Length; i++)
+            for (int i = 0; i < allLines.Count; i++)
             {
                 string line = allLines[i].Trim();
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -105,7 +115,7 @@ public class receiptsController : ControllerBase
 
                 if (conf < 0.8f)
                 {
-                    // not sure => break or skip
+                    // not sure => skip
                     continue;
                 }
 
@@ -126,38 +136,32 @@ public class receiptsController : ControllerBase
                 else if (label == "TOTAL_LINE" && firstLineForTotal)
                 {
                     firstLineForTotal = false;
-                    // We see "TOTAL" or "SUBTOTAL" etc.
-                    // Attempt to also grab the next line if it's numeric or unrecognized with <80% confidence.
-                    string totalLineValue = line; // store the text (like "TOTAL" or "SUBTOTAL")
-
-                    // Peek next line if it exists
-                    if (i + 1 < allLines.Length)
+                    // Attempt to also grab the next line if numeric or unrecognized
+                    if (i + 1 < allLines.Count)
                     {
                         string nextLine = allLines[i + 1].Trim();
                         var (nextLabel, nextConf) = ClassifyLine(predictionEngine, nextLine);
 
-                        // If the model isn't confident about the next line
-                        // or if it's unrecognized, let's see if it's parseable as a decimal
                         if (nextConf < 0.8f || nextLabel == "UNRECOGNIZED_LINE")
                         {
+                            // interpret it as total
                             receipt.Total = nextLine;
                         }
-                    }  
+                    }
                 }
                 else
                 {
-                    // If we get some other label (e.g. PRODUCT_LINE or TOTAL_LINE),
-                    // let's record the first line that isn't MERCHANT_NAME/LOCATION_LINE
+                    // If we get some other label (PRODUCT_LINE, etc.),
+                    // track first line that isn't merchant/address
                     if (firstNonMerchantIndex < 0)
                         firstNonMerchantIndex = i;
-                    // We won't break here, but you could if you only want a contiguous merchant/address block
                 }
             }
 
-            // =========== B) FIND START INDEX FOR PRODUCTS (e.g., after CIF or "Cod Fiscala") ==========
+            // =========== B) FIND START INDEX FOR PRODUCTS (CIF or "Cod Fiscala") ==========
             Regex skipLineRegex = new Regex(@"(?im)^(?:C\.?I\.?F|CIF|Cod\s+Identificare\s+Fiscala)", RegexOptions.Compiled);
             int endOfAddressIndex = -1;
-            for (int i = firstNonMerchantIndex; i < allLines.Length; i++)
+            for (int i = firstNonMerchantIndex; i < allLines.Count; i++)
             {
                 string line = allLines[i].Trim();
                 if (skipLineRegex.IsMatch(line))
@@ -170,44 +174,38 @@ public class receiptsController : ControllerBase
                 ? (endOfAddressIndex + 1)
                 : firstNonMerchantIndex;
 
-            // =========== C) BUILD PRODUCT BLOCKS with your existing 'endOfProductRegex' ===========
-            // This identifies the line that ends a product: e.g. "9.49 B"
+            // =========== C) BUILD PRODUCT BLOCKS =========== 
+            // (unchanged from your code)
             Regex endOfProductRegex = new Regex(@"(?im)\d+(?:[\.,]\d+)?\s+[ABCD]\s*$", RegexOptions.Compiled);
 
             var productBlocks = new List<List<string>>();
             var currentBlock = new List<string>();
 
-            for (int i = startIndexForProducts; i < allLines.Length; i++)
+            for (int i = startIndexForProducts; i < allLines.Count; i++)
             {
                 string line = allLines[i].Trim();
                 if (skipLineRegex.IsMatch(line))
-                    continue;  // skip "CIF" lines
+                    continue;
 
                 currentBlock.Add(line);
 
-                // If line ends with "<price> <VAT letter>", finalize block
                 if (endOfProductRegex.IsMatch(line))
                 {
                     productBlocks.Add(new List<string>(currentBlock));
                     currentBlock.Clear();
                 }
             }
-            // If leftover lines (incomplete block?), optional:
             if (currentBlock.Count > 0)
             {
                 productBlocks.Add(new List<string>(currentBlock));
                 currentBlock.Clear();
             }
 
-            // =========== D) JOIN each product block & FEED to ML as a SINGLE string ===========
+            // =========== D) JOIN + CLASSIFY PRODUCT BLOCKS =========== 
             var confirmedProducts = new List<string>();
-
             foreach (var block in productBlocks)
             {
-                // Join lines with a space or a separator
                 string joined = string.Join(" ", block);
-
-                // Now feed this single joined line to ML
                 var (pLabel, pConf) = ClassifyLine(predictionEngine, joined);
 
                 if (pLabel == "PRODUCT_LINE" && pConf >= 0.8f)
@@ -216,12 +214,11 @@ public class receiptsController : ControllerBase
                 }
                 else
                 {
-                    // Low confidence or different label => skip
                     Console.WriteLine($"Skipping block: {joined} => Label={pLabel}, Conf={pConf:P2}");
                 }
             }
 
-            // =========== E) Print results ===========
+            // Print results
             Console.WriteLine($"--- Supplier: {receipt.Supplier}");
             Console.WriteLine($"--- Address : {receipt.Address}");
             Console.WriteLine($"--- Total   : {receipt.Total}");
@@ -245,7 +242,63 @@ public class receiptsController : ControllerBase
         }
     }
 
-    // helper for ML classification
+    private List<string> RemoveBetweenFilLei(List<string> lines)
+    {
+        var result = new List<string>();
+        int i = 0;
+        while (i < lines.Count)
+        {
+            string currentLine = lines[i].Trim();
+            // Check fuzzy match for "FIL"
+            int scoreFil = Fuzz.Ratio(currentLine, "Fil"); // to do later we need to apply this rule for upper case letters and small letters. 
+            if (scoreFil >= 70)
+            {
+                // We suspect start of the "FIL -> Lei" block
+                // We'll collect lines until we see "Lei" (≥70).
+                bool foundLei = false;
+                int j = i; // remember start
+
+                // Move forward from line i+1 until we find "Lei"
+                int k = i + 1;
+                while (k < lines.Count)
+                {
+                    string nextLine = lines[k].Trim();
+                    int scoreLei = Fuzz.Ratio(nextLine, "Lei");
+                    if (scoreLei >= 70)
+                    {
+                        // We found the "Lei" line => skip everything from i..k inclusive
+                        foundLei = true;
+                        // Move i to k+1
+                        i = k + 1;
+                        break;
+                    }
+                    k++;
+                }
+
+                if (!foundLei)
+                {
+                    // We never found a "Lei" => keep all lines from i..k-1
+                    // since we do NOT remove anything
+                    // So we add them to result
+                    for (int idx = i; idx < k; idx++)
+                    {
+                        result.Add(lines[idx]);
+                    }
+                    i = k; // continue from k
+                }
+            }
+            else
+            {
+                // Not a "FIL" line => keep it
+                result.Add(currentLine);
+                i++;
+            }
+        }
+
+        return result;
+    }   
+
+    // ML classification helper
     private (string Label, float Confidence) ClassifyLine(
         PredictionEngine<LineData, LinePrediction> predictionEngine,
         string text)
