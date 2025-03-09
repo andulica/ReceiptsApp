@@ -228,6 +228,15 @@ public class receiptsController : ControllerBase
                 Console.WriteLine($"   {prod}");
             }
 
+
+            // Save receipt to DB
+            string uniqueBlobStorageName = $"{userId}{DateTime.UtcNow}";
+            receipt.UserId = userId;
+            await _receiptService.UploadToBlobStorage(file, uniqueBlobStorageName);
+            receipt.BlobName = uniqueBlobStorageName;
+            _dbContext.Receipts.Add(receipt);
+            await _dbContext.SaveChangesAsync();
+
             return Ok(new
             {
                 message = "Receipt uploaded and OCR processed successfully",

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using System.Reflection.Metadata;
 
 namespace ReceiptsApp.Server.Models
 {
@@ -7,7 +8,7 @@ namespace ReceiptsApp.Server.Models
         public int Id { get; set; }
         public string UserId { get; set; } = default!;
         //public IdentityUser? User { get; set; }
-        public string Address { get; set; }
+        public string Address { get; set; } = string.Empty;
         public string Supplier { get; set; } = string.Empty;
         public DateTime PurchaseDateTime { get; set; }
         public string Total { get; set; }
