@@ -30,7 +30,7 @@ namespace ReceiptsApp.Server.Services
                 BlobName = uniqueFileName,
                 OcrText = ocrText,
                 Supplier = string.Empty,
-                PurchaseDateTime = DateTime.UtcNow,
+                PurchaseDateTime = string.Empty,
                 Total = "0",
                 Products = new List<ReceiptProduct>()
         };
@@ -39,6 +39,7 @@ namespace ReceiptsApp.Server.Services
             await _dbContext.SaveChangesAsync();
         }
 
+        
         public async Task<string> ProcessOcr(IFormFile file)
         {
             var fileBytes = await FileToBytesAsync(file);

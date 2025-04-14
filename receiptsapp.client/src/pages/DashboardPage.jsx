@@ -1,27 +1,49 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Typography, Button, Card, CardContent, Toolbar } from "@mui/material";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useNavigate } from "react-router-dom";
 
-
-const data = [
-    { name: "Mar", uv: 1500 },
-    { name: "Apr", uv: 1250 },
-    { name: "May", uv: 1750 },
-    { name: "Jun", uv: 2200 },
-    { name: "Jul", uv: 2240 },
-    { name: "Aug", uv: 1900 },
-];
-
 const DashboardPage = () => {
-
+    const [data, setData] = useState([]);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchReceipts = async () => {
+            try {
+                const res = await fetch("https://localhost:7051/api/receipts", {
+                    credentials: "include",
+                });
+                if (!res.ok) throw new Error("Failed to fetch receipts");
+                const receipts = await res.json();
+                
+                // Process receipts to extract total amounts and purchase dates
+                const totalsByMonth = {};
+                receipts.forEach(receipt => {
+                    const month = new Date(receipt.PurchaseDateTime).toLocaleString('default', { month: 'short' });
+                    const total = parseFloat(receipt.Total) || 0;
+
+                    if (!totalsByMonth[month]) {
+                        totalsByMonth[month] = 0;
+                    }
+                    totalsByMonth[month] += total;
+                });
+
+                // Convert totalsByMonth to an array for the chart
+                const chartData = Object.entries(totalsByMonth).map(([name, uv]) => ({ name, uv }));
+                setData(chartData);
+            } catch (error) {
+                console.error("Error fetching receipts:", error);
+            }
+        };
+
+        fetchReceipts();
+    }, []);
 
     return (
         <Box sx={{ flexGrow: 1, p: 2 }}>
             <Toolbar />
             <Toolbar />
-            <Toolbar />
+            <Toolbar /> 
 
             <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
                 <Typography variant="h5" sx={{ flexGrow: 1 }}>

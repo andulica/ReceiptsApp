@@ -1,7 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
-using System.Reflection.Metadata;
-
-namespace ReceiptsApp.Server.Models
+﻿namespace ReceiptsApp.Server.Models
 {
     public class Receipt
     {
@@ -10,7 +7,7 @@ namespace ReceiptsApp.Server.Models
         //public IdentityUser? User { get; set; }
         public string Address { get; set; } = string.Empty;
         public string Supplier { get; set; } = string.Empty;
-        public DateTime PurchaseDateTime { get; set; }
+        public string PurchaseDateTime { get; set; }
         public string Total { get; set; }
         public string? OcrText { get; set; }
         public string BlobName { get; set; } = string.Empty;

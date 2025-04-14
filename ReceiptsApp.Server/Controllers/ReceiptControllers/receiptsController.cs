@@ -9,6 +9,7 @@ using ReceiptsApp.Server.Services;
 using System.Text.RegularExpressions;
 using ReceiptsApp.Server.Models;
 using FuzzySharp;
+using ReceiptsApp.Server.Constants;
 
 namespace ReceiptsApp.Server.Controllers.ReceiptControllers;
 
@@ -20,6 +21,10 @@ public class receiptsController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ReceiptService _receiptService;
+    //// 1) Add a new regex pattern for PurchaseDateTime
+    private static readonly Regex PurchaseDateRegex = new Regex(
+        @"(?i)(\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{1,2}\s+\w+\s+\d{2,4}\b)",
+        RegexOptions.Compiled);
 
     public receiptsController(
 
@@ -31,43 +36,13 @@ public class receiptsController : ControllerBase
         _userManager = userManager;
         _receiptService = receiptService;
     }
-
-    //// 1) Define an enum to identify our regex types:
-    //public enum MyRegexType
-    //{
-    //    CompanyName,
-    //    AddressLine,
-    //    ProductLine,
-    //    Penny
-    //}
-
-    //// 2) Dictionary with two patterns: CompanyName & AddressLine
-    //private static readonly Dictionary<MyRegexType, string> MyRegexPatterns =
-    //    new Dictionary<MyRegexType, string>
-    //    {
-    //        {
-    //            MyRegexType.CompanyName,
-
-    //        @"(?im)^(?<companyName>(?:S\.?C\.?\s+)?.*?\s+(?:S\.?R\.?L\.?|S\.?C\.?S\.?|S\.?N\.?C\.?|S\.?A\.?))\s*$"
-    //        },
-    //        {
-    //            MyRegexType.AddressLine,
- 
-    //        @"(?im)^(?!C\.?I\.?F|CIF|Cod\s+Identificare\s+Fiscala)(?<addressLine>.+)$"
-    //        },
-    //        { 
-    //            MyRegexType.ProductLine, @"(?im)^(?<productLine>.*?\d+(?:[\.,]\d+)?\s+[ABCD])\s*$"
-    //        },
-    //        {
-    //            MyRegexType.Penny, @" ^(?i)(?:fil  |fii  |fll  |eil  |eii  |ell  |fl ).*?(?: lei  |lel  |le   |le)$"
-    //        }
-    //    };
-
-    //private string GetPattern(MyRegexType type)
-    //{
-    //    return MyRegexPatterns[type];
-    //}
-
+    private PredictionEngine<LineData, LinePrediction> LoadPredictionEngine()
+    {
+        // Load the ML model
+        MLContext mlContext = new MLContext();
+        var loadedModel = mlContext.Model.Load("LineClassificationModel.zip", out var modelInputSchema);
+        return mlContext.Model.CreatePredictionEngine<LineData, LinePrediction>(loadedModel);
+    }
 
     [HttpPost("upload")]
     public async Task<IActionResult> UploadReceipt([FromForm] IFormFile file)
@@ -78,143 +53,70 @@ public class receiptsController : ControllerBase
 
         Receipt receipt = new Receipt();
 
-        // 1) Load the ML model
-        MLContext mlContext = new MLContext();
-        var loadedModel = mlContext.Model.Load("LineClassificationModel.zip", out var modelInputSchema);
-        var predictionEngine = mlContext.Model.CreatePredictionEngine<LineData, LinePrediction>(loadedModel);
+        var mlModel = LoadPredictionEngine();
 
-        bool firstLineForTotal = true;
-        try
+        var ocrText = await _receiptService.ProcessOcr(file);
+        Console.WriteLine("--- Raw OCR Text ---");
+        Console.WriteLine(ocrText);
+
+        List<string> rawLines = ocrText
+           .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+           .Select(l => l.Trim())
+           .Where(l => !string.IsNullOrEmpty(l))
+           .ToList();
+
+
+        // --- NEW STEP: remove lines that fuzzy-match "FIL Nume ... Lei" ---
+        var allLines = RemoveBetweenFilLei(rawLines);
+
+        if (string.IsNullOrEmpty(receipt.Supplier))
         {
-            // 2) OCR
-            var ocrText = await _receiptService.ProcessOcr(file);
-            Console.WriteLine("--- Raw OCR Text ---");
-            Console.WriteLine(ocrText);
-
-            // 3) Split into lines
-            List<string> rawLines = ocrText
-               .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
-               .Select(l => l.Trim())
-               .Where(l => !string.IsNullOrEmpty(l))
-               .ToList();
-
-
-            // --- NEW STEP: remove lines that fuzzy-match "FIL Nume ... Lei" ---
-            var allLines = RemoveBetweenFilLei(rawLines);
-
-            // =========== A) CLASSIFY MERCHANT & ADDRESS VIA ML (LINE BY LINE) ===========
-            int firstNonMerchantIndex = -1;
-            for (int i = 0; i < allLines.Count; i++)
+            foreach (var line in allLines)
             {
-                string line = allLines[i].Trim();
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                var (label, conf) = ClassifyLine(predictionEngine, line);
-                Console.WriteLine($"Line: {line}");
-                Console.WriteLine($"   -> Label: {label}, Confidence: {conf:P2}");
-
-                if (conf < 0.8f)
+                foreach (var merchant in MerchantRegexPatterns.Patterns)
                 {
-                    // not sure => skip
-                    continue;
-                }
-
-                if (label == "MERCHANT_NAME")
-                {
-                    if (string.IsNullOrEmpty(receipt.Supplier))
-                        receipt.Supplier = line;
-                    else
-                        receipt.Supplier += " " + line;
-                }
-                else if (label == "LOCATION_LINE")
-                {
-                    if (string.IsNullOrEmpty(receipt.Address))
-                        receipt.Address = line;
-                    else
-                        receipt.Address += ", " + line;
-                }
-                else if (label == "TOTAL_LINE" && firstLineForTotal)
-                {
-                    firstLineForTotal = false;
-                    // Attempt to also grab the next line if numeric or unrecognized
-                    if (i + 1 < allLines.Count)
+                    if (merchant.Value.TryGetValue("CompanyName", out var companyRegex))
                     {
-                        string nextLine = allLines[i + 1].Trim();
-                        var (nextLabel, nextConf) = ClassifyLine(predictionEngine, nextLine);
-
-                        if (nextConf < 0.8f || nextLabel == "UNRECOGNIZED_LINE")
+                        var match = companyRegex.Match(line.ToString());
+                        if (match.Success)
                         {
-                            // interpret it as total
-                            receipt.Total = nextLine;
+                            receipt.Supplier = merchant.Key;
+                            break;
                         }
                     }
                 }
-                else
-                {
-                    // If we get some other label (PRODUCT_LINE, etc.),
-                    // track first line that isn't merchant/address
-                    if (firstNonMerchantIndex < 0)
-                        firstNonMerchantIndex = i;
-                }
-            }
 
-            // =========== B) FIND START INDEX FOR PRODUCTS (CIF or "Cod Fiscala") ==========
-            Regex skipLineRegex = new Regex(@"(?im)^(?:C\.?I\.?F|CIF|Cod\s+Identificare\s+Fiscala)", RegexOptions.Compiled);
-            int endOfAddressIndex = -1;
-            for (int i = firstNonMerchantIndex; i < allLines.Count; i++)
-            {
-                string line = allLines[i].Trim();
-                if (skipLineRegex.IsMatch(line))
+                if (!string.IsNullOrEmpty(receipt.Supplier))
                 {
-                    endOfAddressIndex = i;
                     break;
                 }
             }
-            int startIndexForProducts = (endOfAddressIndex >= 0)
-                ? (endOfAddressIndex + 1)
-                : firstNonMerchantIndex;
+        }
 
-            // =========== C) BUILD PRODUCT BLOCKS =========== 
-            // (unchanged from your code)
-            Regex endOfProductRegex = new Regex(@"(?im)\d+(?:[\.,]\d+)?\s+[ABCD]\s*$", RegexOptions.Compiled);
-
-            var productBlocks = new List<List<string>>();
-            var currentBlock = new List<string>();
-
-            for (int i = startIndexForProducts; i < allLines.Count; i++)
+        if (!string.IsNullOrEmpty(receipt.Supplier) && MerchantRegexPatterns.Patterns.TryGetValue(receipt.Supplier, out var regexPatterns))
+        {
+            foreach (var line in allLines)
             {
-                string line = allLines[i].Trim();
-                if (skipLineRegex.IsMatch(line))
-                    continue;
-
-                currentBlock.Add(line);
-
-                if (endOfProductRegex.IsMatch(line))
+                foreach (var pattern in regexPatterns)
                 {
-                    productBlocks.Add(new List<string>(currentBlock));
-                    currentBlock.Clear();
-                }
-            }
-            if (currentBlock.Count > 0)
-            {
-                productBlocks.Add(new List<string>(currentBlock));
-                currentBlock.Clear();
-            }
+                    if (pattern.Key == "CompanyName") continue; // Skip checking the CompanyName again
 
-            // =========== D) JOIN + CLASSIFY PRODUCT BLOCKS =========== 
-            var confirmedProducts = new List<string>();
-            foreach (var block in productBlocks)
-            {
-                string joined = string.Join(" ", block);
-                var (pLabel, pConf) = ClassifyLine(predictionEngine, joined);
-
-                if (pLabel == "PRODUCT_LINE" && pConf >= 0.8f)
-                {
-                    confirmedProducts.Add(joined);
-                }
-                else
-                {
-                    Console.WriteLine($"Skipping block: {joined} => Label={pLabel}, Conf={pConf:P2}");
+                    var match = pattern.Value.Match(line);
+                    if (match.Success)
+                    {
+                        switch (pattern.Key)
+                        {
+                            case "Address":
+                                receipt.Address = match.Value;
+                                break;
+                            case "Total":
+                                receipt.Total = match.Groups[1].Value;
+                                break;
+                            case "Date":
+                                receipt.PurchaseDateTime = match.Groups[1].Value;
+                                break;
+                        }
+                    }
                 }
             }
 
@@ -223,32 +125,27 @@ public class receiptsController : ControllerBase
             Console.WriteLine($"--- Address : {receipt.Address}");
             Console.WriteLine($"--- Total   : {receipt.Total}");
             Console.WriteLine("--- Products (Joined) ---");
-            foreach (var prod in confirmedProducts)
-            {
-                Console.WriteLine($"   {prod}");
-            }
 
+            // Save receipt to DB !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            // Save receipt to DB
-            string uniqueBlobStorageName = $"{userId}{DateTime.UtcNow}";
-            receipt.UserId = userId;
-            await _receiptService.UploadToBlobStorage(file, uniqueBlobStorageName);
-            receipt.BlobName = uniqueBlobStorageName;
-            _dbContext.Receipts.Add(receipt);
-            await _dbContext.SaveChangesAsync();
-
-            return Ok(new
-            {
-                message = "Receipt uploaded and OCR processed successfully",
-                CompanyName = receipt.Supplier,
-                Address = receipt.Address,
-                Products = confirmedProducts
-            });
+            //!!!!
+            //    !!
+            //    !!!
+            //string uniqueBlobStorageName = $"{userId}{DateTime.UtcNow}";
+            //receipt.UserId = userId;
+            //await _receiptService.UploadToBlobStorage(file, uniqueBlobStorageName);
+            //receipt.BlobName = uniqueBlobStorageName;
+            //_dbContext.Receipts.Add(receipt);
+            //await _dbContext.SaveChangesAsync();
         }
-        catch (Exception ex)
+
+        return Ok(new
         {
-            return StatusCode(500, $"Error processing receipt: {ex.Message}");
-        }
+            message = "Receipt uploaded and OCR processed successfully",
+            CompanyName = receipt.Supplier,
+            Address = receipt.Address,
+            //Products = confirmedProducts
+        });
     }
 
     private List<string> RemoveBetweenFilLei(List<string> lines)
@@ -305,7 +202,7 @@ public class receiptsController : ControllerBase
         }
 
         return result;
-    }   
+    }
 
     // ML classification helper
     private (string Label, float Confidence) ClassifyLine(
