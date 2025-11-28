@@ -23,24 +23,6 @@ namespace ReceiptsApp.Server.Services
             _azureConnectionString = config["AzureStorage:ConnectionString"] ?? throw new ArgumentNullException("AzureStorage connection string missing");
         }
 
-        public async Task SaveReceiptAsync(string userId, string uniqueFileName, string ocrText)
-        {
-            var receipt = new Receipt
-            {
-                UserId = userId,
-                BlobName = uniqueFileName,
-                OcrText = ocrText,
-                Supplier = string.Empty,
-                PurchaseDateTime = string.Empty,
-                Total = "0",
-                Products = new List<ReceiptProduct>()
-            };
-
-            _dbContext.Receipts.Add(receipt);
-            await _dbContext.SaveChangesAsync();
-        }
-
-
         public async Task<string> ProcessOcr(IFormFile file)
         {
             var fileBytes = await FileToBytesAsync(file);
@@ -207,11 +189,32 @@ namespace ReceiptsApp.Server.Services
             var dateMatch = lines.Select(l => DateRegex.Match(l)).FirstOrDefault(m => m.Success);
             if (dateMatch != null)
             {
-                receipt.PurchaseDateTime = dateMatch.Groups[1].Value.Trim();
-                Console.WriteLine($"Date found: {receipt.PurchaseDateTime}");
+                var dateStr = dateMatch.Groups[1].Value.Trim(); // ex: "25/12/2024"
+                DateTime purchaseDate;
+                bool success = DateTime.TryParseExact(
+                    dateStr,
+                    "dd/MM/yyyy",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out purchaseDate);
+
+                if (success)
+                {
+                    receipt.PurchaseDateTime = purchaseDate; // ora e 00:00:00 implicit
+                    Console.WriteLine($"Date found: {receipt.PurchaseDateTime.Value.ToString("yyyy-MM-dd")}");
+                }
+                else
+                {
+                    receipt.PurchaseDateTime = null;
+                    Console.WriteLine("Date parsing failed.");
+                }
+            }
+            else
+            {
+                receipt.PurchaseDateTime = null;
+                Console.WriteLine("Date not found.");
             }
 
-            receipt.PurchaseDateTime = "2025-12-01 00:00:00.0000000";
 
             // 💰 Total
             var totalMatch = lines.Select(l => TotalRegex.Match(l)).LastOrDefault(m => m.Success);
