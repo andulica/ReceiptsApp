@@ -1,4 +1,6 @@
-﻿namespace ReceiptsApp.Server.Models
+﻿using System.Text.Json.Serialization;
+
+namespace ReceiptsApp.Server.Models
 {
     public class ReceiptProduct
     {
@@ -10,6 +12,8 @@
         public decimal TotalPrice { get; set; }
         public int ReceiptId { get; set; } 
         public string Category { get; set; }
+
+        [JsonIgnore] // <-- adaugă asta!
         public Receipt Receipt { get; set; } 
     }
 }

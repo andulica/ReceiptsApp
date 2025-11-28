@@ -5,7 +5,7 @@ VisualStudioVersion = 17.9.34902.65
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ReceiptsApp.Server", "ReceiptsApp.Server\ReceiptsApp.Server.csproj", "{63A51E42-4570-40BB-90C7-C61A323E91B4}"
 EndProject
-Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "receiptsapp.client", "receiptsapp.client\receiptsapp.client.esproj", "{7457040A-9175-4129-A418-0A05C80DDBCB}"
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "ReceiptsApp.client", "receiptsapp.client\ReceiptsApp.client.esproj", "{7457040A-9175-4129-A418-0A05C80DDBCB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

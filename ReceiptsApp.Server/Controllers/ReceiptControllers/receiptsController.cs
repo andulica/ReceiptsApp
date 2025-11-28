@@ -56,18 +56,37 @@ public class receiptsController : ControllerBase
         if (string.IsNullOrEmpty(userId))
             return Unauthorized("User not logged in");
 
+        // 1️⃣ Generează nume unic pentru blob
+        var uniqueFileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
+
+        // 2️⃣ Încarcă fișierul în Blob Storage
+        await _receiptService.UploadToBlobStorage(file, uniqueFileName);
+
+        // 3️⃣ Rulează OCR
         var ocrText = await _receiptService.ProcessOcr(file);
         if (string.IsNullOrWhiteSpace(ocrText))
             return BadRequest("OCR returned no text");
 
+        // 4️⃣ Parsează textul OCR
         var receipt = _receiptService.ParseOcrText(ocrText);
         receipt.UserId = userId;
+        receipt.BlobName = uniqueFileName; // sau BlobUrl, dacă preferi
 
-        //_dbContext.Receipts.Add(receipt);
-        //await _dbContext.SaveChangesAsync();
+        // 5️⃣ Salvează în DB
+        _dbContext.Receipts.Add(receipt);
+        await _dbContext.SaveChangesAsync();
 
-        return Ok(receipt);
+        // 6️⃣ Returnează doar informațiile utile
+        return Ok(new
+        {
+            receipt.Id,
+            receipt.Supplier,
+            receipt.Total,
+            receipt.BlobName,
+            receipt.PurchaseDateTime
+        });
     }
+
 
     [HttpGet("{id}/image")]
     public async Task<IActionResult> GetReceiptImage(int id)

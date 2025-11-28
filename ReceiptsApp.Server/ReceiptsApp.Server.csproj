@@ -31,7 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\receiptsapp.client\receiptsapp.client.esproj">
+    <ProjectReference Include="..\receiptsapp.client\ReceiptsApp.client.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>

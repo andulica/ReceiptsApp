@@ -99,8 +99,8 @@ namespace ReceiptsApp.Server.Services
         }
 
         // 🧠 REGEX-uri universale (independente de comerciant)
-        private static readonly Regex SupplierRegex =
-            new(@"(S\.?C\.?\s*[A-Z0-9\(\)\s]+S\.?R\.?L\.?)", RegexOptions.IgnoreCase);
+        private static readonly Regex SupplierRegex = new Regex(@"^(S\.C\.|S\.R\.L\.|S\.A\.|P\.F\.A\.|I\.F\.|S\.C\.S\.|S\.C\.M\.|C\.I\.)\s+.+", RegexOptions.IgnoreCase);
+
 
         private static readonly Regex AddressRegex =
             new(@"(JUDET[^\n]*|MUNICIPIUL[^\n]*|STR\.?.*?NR\.?.*)", RegexOptions.IgnoreCase);
@@ -156,11 +156,43 @@ namespace ReceiptsApp.Server.Services
                 Console.WriteLine($"Line: {l}");
 
             // 🏪 Supplier
-            var supplierMatch = lines.Select(l => SupplierRegex.Match(l)).FirstOrDefault(m => m.Success);
-            if (supplierMatch != null)
+            string[] legalForms = new[] { "S.C.", "S.R.L.", "S.A.", "P.F.A.", "I.F.", "S.C.S.", "S.C.M.", "C.I." };
+            string[] knownMerchants = new[] { "PENNY", "KAUFLAND", "LIDL", "CARREFOUR", "AUCHAN", "MEGA IMAGE", "BON", "MAGAZIN" };
+
+            int ScoreLine(string line)
             {
-                receipt.Supplier = supplierMatch.Value.Trim();
-                Console.WriteLine($"Supplier found: {receipt.Supplier}");
+                int score = 0;
+
+                if (legalForms.Any(f => line.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0))
+                    score += 5;
+
+                if (knownMerchants.Any(k => line.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+                    score += 3;
+
+                if (line.All(c => char.IsUpper(c) || char.IsWhiteSpace(c) || c == '.' || c == '-' || c == ','))
+                    score += 2;
+
+                if (Regex.IsMatch(line, @"(R|CIF)\s*\d{6,}"))
+                    score += 1;
+
+                return score;
+            }
+
+            var candidateLines = lines.Take(5).ToList();
+
+            var bestLine = candidateLines
+                .Select(l => new { Line = l, Score = ScoreLine(l) })
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (bestLine != null && bestLine.Score > 0)
+            {
+                receipt.Supplier = bestLine.Line.Trim();
+                Console.WriteLine($"Supplier found (best guess): {receipt.Supplier}");
+            }
+            else
+            {
+                Console.WriteLine("Supplier not found");
             }
 
             // 🏠 Address
@@ -178,6 +210,8 @@ namespace ReceiptsApp.Server.Services
                 receipt.PurchaseDateTime = dateMatch.Groups[1].Value.Trim();
                 Console.WriteLine($"Date found: {receipt.PurchaseDateTime}");
             }
+
+            receipt.PurchaseDateTime = "2025-12-01 00:00:00.0000000";
 
             // 💰 Total
             var totalMatch = lines.Select(l => TotalRegex.Match(l)).LastOrDefault(m => m.Success);
