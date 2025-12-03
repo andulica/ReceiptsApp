@@ -19,8 +19,8 @@ const DashboardPage = () => {
                 // Process receipts to extract total amounts and purchase dates
                 const totalsByMonth = {};
                 receipts.forEach(receipt => {
-                    const month = new Date(receipt.PurchaseDateTime).toLocaleString('default', { month: 'short' });
-                    const total = parseFloat(receipt.Total) || 0;
+                    const month = new Date(receipt.purchaseDateTime).toLocaleString('default', { month: 'short' });
+                    const total = parseFloat(receipt.total) || 0;
 
                     if (!totalsByMonth[month]) {
                         totalsByMonth[month] = 0;
