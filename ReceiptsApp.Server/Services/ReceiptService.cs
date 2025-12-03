@@ -185,36 +185,49 @@ namespace ReceiptsApp.Server.Services
                 Console.WriteLine($"Address found: {receipt.Address}");
             }
 
-            // 📅 Date
-            var dateMatch = lines.Select(l => DateRegex.Match(l)).FirstOrDefault(m => m.Success);
+            // 📅 Regex universal (match pentru linii cu dată)
+            Regex dateRegex = new Regex(@"(\d{1,2})[- ./](\d{1,2})[- ./](\d{2,4})");
+
+            // Caută prima linie care conține o dată
+            var dateMatch = lines
+                .Select(l => dateRegex.Match(l))
+                .FirstOrDefault(m => m.Success);
+
             if (dateMatch != null)
             {
-                var dateStr = dateMatch.Groups[1].Value.Trim(); // ex: "25/12/2024"
+                string dateStr = dateMatch.Value.Trim(); // ex: "12-12-2024"
                 DateTime purchaseDate;
+
+                string[] formats = new[]
+                {
+                    "dd/MM/yyyy", "dd-MM-yyyy", "dd.MM.yyyy", "dd MM yyyy",
+                    "dd/MM/yy",   "dd-MM-yy",   "dd.MM.yy",
+                    "yyyy-MM-dd", "yyyy/MM/dd"
+                };
+
                 bool success = DateTime.TryParseExact(
                     dateStr,
-                    "dd/MM/yyyy",
+                    formats,
                     CultureInfo.InvariantCulture,
                     DateTimeStyles.None,
                     out purchaseDate);
 
                 if (success)
                 {
-                    receipt.PurchaseDateTime = purchaseDate; // ora e 00:00:00 implicit
-                    Console.WriteLine($"Date found: {receipt.PurchaseDateTime.Value.ToString("yyyy-MM-dd")}");
+                    receipt.PurchaseDateTime = purchaseDate;
+                    Console.WriteLine($"Date found: {purchaseDate:yyyy-MM-dd}");
                 }
                 else
                 {
+                    Console.WriteLine($"Failed to parse date: {dateStr}");
                     receipt.PurchaseDateTime = null;
-                    Console.WriteLine("Date parsing failed.");
                 }
             }
             else
             {
+                Console.WriteLine("No date detected in receipt text.");
                 receipt.PurchaseDateTime = null;
-                Console.WriteLine("Date not found.");
             }
-
 
             // 💰 Total
             var totalMatch = lines.Select(l => TotalRegex.Match(l)).LastOrDefault(m => m.Success);
